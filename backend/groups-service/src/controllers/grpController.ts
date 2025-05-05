@@ -6,12 +6,25 @@ import { sendEmail } from '../utils/mailer';   // new added
 import { logActivity } from '../utils/auditLogger';  //new added
 
 export const createGroup = async (req:Request,res:Response) => {
-    const group = new Group(req.body);
-    try{
+    try {
+        // If endDate is not provided, calculate it based on startDate and duration
+        if (!req.body.endDate && req.body.startDate && req.body.duration) {
+            const startDate = new Date(req.body.startDate);
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + req.body.duration);
+            req.body.endDate = endDate;
+        }
+        
+        const group = new Group(req.body);
         const newGroup = await group.save();
+        
+        // Log activity
+        logActivity('CREATE_GROUP', `Created group with ID: ${newGroup.groupId}`, req.body.userId || 'anonymous', newGroup.groupId);
+        
         res.status(201).json(newGroup);
-    }catch(error){
-        res.status(400).json({message:error});
+    } catch(error) {
+        console.error('Error creating group:', error);
+        res.status(400).json({message: error});
     }
 }
 
@@ -22,12 +35,15 @@ export const getAllGroups = async (req:Request, res:Response) => {
         // Add status to each group
         const groupsWithStatus = groups.map(group => {
             const now = new Date();
-            const creationDate = new Date(group.createdAt);
-            const endDate = new Date(creationDate);
-            endDate.setMonth(endDate.getMonth() + group.duration);
+            const startDate = (group as any).startDate ? new Date((group as any).startDate) : new Date(group.createdAt);
+            const endDate = (group as any).endDate ? new Date((group as any).endDate) : (() => {
+                const date = new Date(startDate);
+                date.setMonth(date.getMonth() + group.duration);
+                return date;
+            })();
             
             let status = 'active';
-            if (now < creationDate) {
+            if (now < startDate) {
                 status = 'pending';
             } else if (now > endDate) {
                 status = 'closed';
@@ -318,12 +334,15 @@ export const getByGroupId = async (req: Request, res: Response) => {
 
     // Calculate status based on dates
     const now = new Date();
-    const creationDate = new Date(group.createdAt);
-    const endDate = new Date(creationDate);
-    endDate.setMonth(endDate.getMonth() + group.duration);
+    const startDate = (group as any).startDate ? new Date((group as any).startDate) : new Date(group.createdAt);
+    const endDate = (group as any).endDate ? new Date((group as any).endDate) : (() => {
+        const date = new Date(startDate);
+        date.setMonth(date.getMonth() + group.duration);
+        return date;
+    })();
     
     let status = 'active';
-    if (now < creationDate) {
+    if (now < startDate) {
       status = 'pending';
     } else if (now > endDate) {
       status = 'closed';

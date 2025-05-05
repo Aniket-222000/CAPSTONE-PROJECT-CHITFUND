@@ -30,95 +30,102 @@ export interface IGroup extends Document {
   updatedAt: Date;
 }
 
-const groupSchema: Schema<IGroup> = new Schema(
-  {
-    groupId: { type: String, required: true, unique: true },
-    groupName: { type: String, required: true, unique: true },
-    groupType: { type: String, required: true },
-    interest: { type: Number, required: true },
-    organizerId: { type: String, required: true },
-    members: { type: Number, required: true },
-    duration: { type: Number, required: true },
-    totalAmount: { type: Number, required: true },
-    ticketValue: { type: Number, required: true },
-    participants: { type: [String], default: [] },
-    joinRequests: { type: [String], default: [] },
-    monthlyDraw: { type: [String], default: [] },
-    description: { type: String, required: true },
+const groupSchema = new mongoose.Schema({
+  groupId: { type: String, required: true, unique: true },
+  groupName: { type: String, required: true, unique: true },
+  groupType: { type: String, required: true },
+  interest: { type: Number, required: true },
+  organizerId: { type: String, required: true },
+  members: { type: Number, required: true },
+  duration: { type: Number, required: true },
+  totalAmount: { type: Number, required: true },
+  ticketValue: { type: Number, required: true },
+  participants: { type: [String], default: [] },
+  joinRequests: { type: [String], default: [] },
+  monthlyDraw: { type: [String], default: [] },
+  description: { type: String, required: true },
 
-    // Penalty tracking
-    penalties: [
-      {
-        userId: { type: String, required: true },
-        penalty: { type: Number, required: true },
-      },
-    ],
+  // Penalty tracking
+  penalties: [
+    {
+      userId: { type: String, required: true },
+      penalty: { type: Number, required: true },
+    },
+  ],
 
-    // Lateral member requests
-    lateralRequests: { type: [String], default: [] },
+  // Lateral member requests
+  lateralRequests: { type: [String], default: [] },
 
-    // Bid records
-    bids: [
-      {
-        userId: { type: String, required: true },
-        bidAmount: { type: Number, required: true },
-        month: { type: Number, required: true },
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
+  // Bid records
+  bids: [
+    {
+      userId: { type: String, required: true },
+      bidAmount: { type: Number, required: true },
+      month: { type: Number, required: true },
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
 
-    // Contributions and back-dated payments
-    contributions: [
-      {
-        userId: { type: String, required: true },
-        month: { type: Schema.Types.Mixed, required: true },
-        amount: { type: Number, required: true },
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
+  // Contributions and back-dated payments
+  contributions: [
+    {
+      userId: { type: String, required: true },
+      month: { type: Schema.Types.Mixed, required: true },
+      amount: { type: Number, required: true },
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
 
-    // Warnings for missed payments
-    warnings: [
-      {
-        userId: { type: String, required: true },
-        month: { type: Number },
-        count: { type: Number, required: true, default: 0 },
-      },
-    ],
+  // Warnings for missed payments
+  warnings: [
+    {
+      userId: { type: String, required: true },
+      month: { type: Number },
+      count: { type: Number, required: true, default: 0 },
+    },
+  ],
 
-    // Approved lateral members
-    lateralMembers: [
-      {
-        userId: { type: String, required: true },
-        paidBackdated: { type: Boolean, required: true, default: false },
-      },
-    ],
+  // Approved lateral members
+  lateralMembers: [
+    {
+      userId: { type: String, required: true },
+      paidBackdated: { type: Boolean, required: true, default: false },
+    },
+  ],
 
-    // Organizer compensation records
-    organizerCompensations: [
-      {
-        month: { type: Number, required: true },
-        amount: { type: Number, required: true },
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
+  // Organizer compensation records
+  organizerCompensations: [
+    {
+      month: { type: Number, required: true },
+      amount: { type: Number, required: true },
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
 
-    // Bid adjustments by organizer
-    bidAdjustments: [
-      {
-        month: { type: Number, required: true },
-        oldAmount: { type: Number, required: true },
-        newAmount: { type: Number, required: true },
-        timestamp: { type: Date, default: Date.now },
-      },
-    ],
+  // Bid adjustments by organizer
+  bidAdjustments: [
+    {
+      month: { type: Number, required: true },
+      oldAmount: { type: Number, required: true },
+      newAmount: { type: Number, required: true },
+      timestamp: { type: Date, default: Date.now },
+    },
+  ],
+  startDate: {
+    type: Date,
+    required: true,
+    default: Date.now
   },
-  {
-    collection: 'groups',
-    versionKey: false,
-    timestamps: true,
-  }
-);
+  endDate: {
+    type: Date,
+    required: true
+  },
+},
+{
+  collection: 'groups',
+  versionKey: false,
+  timestamps: true,
+});
 
 const Group = mongoose.model<IGroup>('Group', groupSchema);
 export default Group;
@@ -141,6 +148,4 @@ groupSchema.virtual('status').get(function() {
 // Ensure virtuals are included when converting to JSON
 groupSchema.set('toJSON', { 
   virtuals: true,
-  // ... existing code ...
 });
-// ... existing code ...
