@@ -122,3 +122,25 @@ const groupSchema: Schema<IGroup> = new Schema(
 
 const Group = mongoose.model<IGroup>('Group', groupSchema);
 export default Group;
+
+groupSchema.virtual('status').get(function() {
+  const now = new Date();
+  const creationDate = new Date(this.createdAt);
+  const endDate = new Date(creationDate);
+  endDate.setMonth(endDate.getMonth() + this.duration);
+  
+  if (now < creationDate) {
+    return 'pending';
+  } else if (now > endDate) {
+    return 'closed';
+  } else {
+    return 'active';
+  }
+});
+
+// Ensure virtuals are included when converting to JSON
+groupSchema.set('toJSON', { 
+  virtuals: true,
+  // ... existing code ...
+});
+// ... existing code ...

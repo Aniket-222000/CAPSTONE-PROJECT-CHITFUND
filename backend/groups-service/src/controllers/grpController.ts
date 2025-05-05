@@ -18,7 +18,28 @@ export const createGroup = async (req:Request,res:Response) => {
 export const getAllGroups = async (req:Request, res:Response) => {
     try{
         const groups = await Group.find();
-        res.status(200).json(groups);
+        
+        // Add status to each group
+        const groupsWithStatus = groups.map(group => {
+            const now = new Date();
+            const creationDate = new Date(group.createdAt);
+            const endDate = new Date(creationDate);
+            endDate.setMonth(endDate.getMonth() + group.duration);
+            
+            let status = 'active';
+            if (now < creationDate) {
+                status = 'pending';
+            } else if (now > endDate) {
+                status = 'closed';
+            }
+            
+            return {
+                ...group.toJSON(),
+                status
+            };
+        });
+        
+        res.status(200).json(groupsWithStatus);
     }catch(error){
         res.status(400).json({message:error});
     }
@@ -286,34 +307,39 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
   };
   
 
-//==================old code =========
-// export const getByGroupId =async (req:Request,res:Response)=>{
-//     try{
-//         const group = await Group.findOne({groupId:req.params.groupId});
-//         if(!group){
-//              res.status(404).json({message:"Group not found"});
-//         }
-//         res.status(200).json(group);
-//     }catch(error){
-//         res.status(400).json({message:error});
-//     }
-// }
-//==================================
-
 export const getByGroupId = async (req: Request, res: Response) => {
-    try {
-      const group = await Group.findOne({ groupId: req.params.groupId });
-      if (!group) {
-        return res.status(404).json({ message: 'Group not found' });
-      }
-      // Log group fetch activity
-      logActivity('FETCH_GROUP', `Fetched group with ID: ${group.groupId}`, req.body.userId || 'anonymous', group.groupId);
-
-      res.status(200).json(group);
-    } catch (error) {
-      res.status(400).json({ message: error });
+  try {
+    const group = await Group.findOne({ groupId: req.params.groupId });
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
     }
-  };
+    // Log group fetch activity
+    logActivity('FETCH_GROUP', `Fetched group with ID: ${group.groupId}`, req.body.userId || 'anonymous', group.groupId);
+
+    // Calculate status based on dates
+    const now = new Date();
+    const creationDate = new Date(group.createdAt);
+    const endDate = new Date(creationDate);
+    endDate.setMonth(endDate.getMonth() + group.duration);
+    
+    let status = 'active';
+    if (now < creationDate) {
+      status = 'pending';
+    } else if (now > endDate) {
+      status = 'closed';
+    }
+
+    // Include status in response
+    const groupWithStatus = {
+      ...group.toJSON(),
+      status
+    };
+
+    res.status(200).json(groupWithStatus);
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
+};
 
   export const handleMissedPayment = async (req: Request, res: Response): Promise<void> => {
     try {
