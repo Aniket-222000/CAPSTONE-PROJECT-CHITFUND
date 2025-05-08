@@ -1,6 +1,7 @@
 import app from "./app";
 import mongoose from "mongoose";
 import 'dotenv/config';
+import scheduledTasks from './services/scheduledTasks';
 
 const PORT = process.env.PORT || 3003;
 
@@ -14,3 +15,4 @@ mongoose.connect(process.env.mongo_uri as string)
 app.listen(PORT, () => {
   console.log('groups-service is running on port',PORT);
 });
+scheduledTasks.initTasks();

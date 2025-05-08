@@ -11,6 +11,8 @@ import { AuthService } from '../../auth/auth.service';
 })
 export class NavbarComponent implements OnInit {
   isAuthenticated = false;
+isLoggedIn: any;
+user: any;
 
   constructor(private authService: AuthService, private router: Router) {}
 

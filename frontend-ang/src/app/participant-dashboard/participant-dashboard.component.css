@@ -1,0 +1,87 @@
+/* Dashboard Styles */
+.bg-gradient-to-r {
+  background: linear-gradient(to right, #ebf8ff, #d1fae5);
+}
+
+.container {
+  max-width: 1280px;
+}
+
+/* Card Hover Effects */
+.hover\:shadow-lg:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Button Styles */
+button {
+  transition: all 0.3s ease;
+}
+
+.bg-indigo-800 {
+  background-color: #3730a3;
+}
+
+.hover\:bg-indigo-400:hover {
+  background-color: #818cf8;
+}
+
+/* Icon Backgrounds */
+.bg-blue-100 {
+  background-color: #dbeafe;
+}
+
+.bg-green-100 {
+  background-color: #d1fae5;
+}
+
+.bg-purple-100 {
+  background-color: #ede9fe;
+}
+
+.bg-yellow-100 {
+  background-color: #fef3c7;
+}
+
+/* Text Colors */
+.text-blue-500 {
+  color: #3b82f6;
+}
+
+.text-green-500 {
+  color: #10b981;
+}
+
+.text-purple-500 {
+  color: #8b5cf6;
+}
+
+.text-yellow-500 {
+  color: #f59e0b;
+}
+
+.text-red-500 {
+  color: #ef4444;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .quick-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+  }
+}

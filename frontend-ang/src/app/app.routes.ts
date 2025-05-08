@@ -14,12 +14,15 @@ import { PlanDetailsComponent } from './plan-details/plan-details.component';
 import { ProfileComponent } from './profile/profile.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { ViewUserTransactionsComponent } from './view-user-transactions/view-user-transactions.component';
-
+import { ParticipantDashboardComponent } from './participant-dashboard/participant-dashboard.component';
 
 export const routes: Routes = [
     { path: '', component: HomePageComponent },
     { path: 'login', component: LoginComponent },
     { path: 'register', component: RegistrationComponent },
+    
+        // ... existing code ...
+        { path: 'dashboard', component: ParticipantDashboardComponent },
     { path: 'mygroups', component: MyGroupsComponent },
     { path: 'chitplans', component: ChitPlansComponent },
     { path: 'plan', component: PlanDetailsComponent },

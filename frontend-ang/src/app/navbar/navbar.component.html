@@ -33,4 +33,9 @@
       </a>
     </ng-container>
   </div>
+
+  <li class="nav-item" *ngIf="isLoggedIn && user?.userRole === 'participant'">
+    <a class="nav-link" routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+  </li>
+
 </nav>

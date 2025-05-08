@@ -165,12 +165,14 @@ export class TransactionService {
     });
     logActivity('CREATE_CREDIT', `Created credit ${creditId}`, organizerId, groupId);
 
+
     // Notify user
-    const userRes = await axios.get(`${this.usersUrl}/id/${userId}`);
+    const userRes = await axios.get(`${this.usersUrl}/${userId}`);
+    console.log("hello"); // Debugging statement
     await sendEmail(userRes.data.userEmail, 'Contribution Received', `Your payment of ₹${transactionAmount} is recorded.`);
 
     // Notify organizer
-    const orgRes = await axios.get(`${this.usersUrl}/id/${organizerId}`);
+    const orgRes = await axios.get(`${this.usersUrl}/${organizerId}`);
     await sendEmail(orgRes.data.userEmail, 'New Contribution', `User ${userRes.data.userName} paid ₹${transactionAmount}.`);
 
     return { debit, credit };

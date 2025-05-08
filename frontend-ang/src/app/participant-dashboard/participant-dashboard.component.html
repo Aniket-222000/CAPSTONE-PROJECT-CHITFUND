@@ -1,0 +1,197 @@
+<div class="flex flex-col min-h-screen bg-gradient-to-r from-blue-100 to-green-100">
+  <!-- Loading and Error States -->
+  <div *ngIf="isLoading" class="flex items-center justify-center min-h-screen">
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+      <p class="mt-2 text-gray-600">Loading your dashboard...</p>
+    </div>
+  </div>
+
+  <div *ngIf="error && !isLoading" class="flex items-center justify-center min-h-screen">
+    <div class="text-center text-red-500">
+      <p>{{ error }}</p>
+      <button routerLink="/login" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded-md"></button>
+        Return to Login
+Return to Login
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div *ngIf="!isLoading && !error" class="container mx-auto px-4 py-8">
+    <!-- Welcome Section -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">Welcome, {{ user?.userName }}</h1>
+          <p class="text-gray-600 mt-2">Manage your fund groups and transactions</p>
+        </div>
+        <button (click)="navigateToProfile()" class="bg-indigo-800 text-white px-4 py-2 rounded-md hover:bg-indigo-400 transition">
+          <i class="fas fa-user mr-2"></i> My Profile
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm">Total Groups</p>
+            <h3 class="text-2xl font-bold text-gray-800">{{ myGroups.length }}</h3>
+          </div>
+          <div class="bg-blue-100 p-3 rounded-full">
+            <i class="fas fa-users text-blue-500"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm">Active Payments</p>
+            <h3 class="text-2xl font-bold text-gray-800">{{ upcomingPayments.length }}</h3>
+          </div>
+          <div class="bg-green-100 p-3 rounded-full">
+            <i class="fas fa-money-bill-wave text-green-500"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm">Recent Transactions</p>
+            <h3 class="text-2xl font-bold text-gray-800">{{ recentTransactions.length }}</h3>
+          </div>
+          <div class="bg-purple-100 p-3 rounded-full">
+            <i class="fas fa-exchange-alt text-purple-500"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-gray-500 text-sm">Next Payment</p>
+            <h3 class="text-2xl font-bold text-gray-800">{{ upcomingPayments.length > 0 ? upcomingPayments[0].dueDate : 'N/A' }}</h3>
+          </div>
+          <div class="bg-yellow-100 p-3 rounded-full">
+            <i class="fas fa-calendar-alt text-yellow-500"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Sections -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- My Groups Section -->
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-indigo-800 text-white p-4 flex justify-between items-center">
+          <h2 class="text-xl font-semibold">My Groups</h2>
+          <button (click)="navigateToGroups()" class="text-white hover:underline">
+            View All <i class="fas fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+        <div class="p-4">
+          <div *ngIf="myGroups.length === 0" class="text-center py-4 text-gray-500">
+            You are not part of any groups yet.
+          </div>
+          <div *ngFor="let group of myGroups.slice(0, 3)" class="border-b last:border-b-0 py-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-gray-800">{{ group.groupName }}</h3>
+                <p class="text-sm text-gray-600">Members: {{ group.members }} | Duration: {{ group.duration }} months</p>
+              </div>
+              <button (click)="navigateToGroupDetails(group.groupId)" class="text-blue-500 hover:underline">
+                Details
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions Section -->
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-indigo-800 text-white p-4 flex justify-between items-center">
+          <h2 class="text-xl font-semibold">Recent Transactions</h2>
+          <button (click)="navigateToTransactions()" class="text-white hover:underline">
+            View All <i class="fas fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+        <div class="p-4">
+          <div *ngIf="recentTransactions.length === 0" class="text-center py-4 text-gray-500">
+            No recent transactions.
+          </div>
+          <div *ngFor="let transaction of recentTransactions" class="border-b last:border-b-0 py-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-gray-800">{{ transaction.transactionType }}</h3>
+                <p class="text-sm text-gray-600">{{ transaction.transactionDate }}</p>
+              </div>
+              <span [class]="transaction.transactionType === 'credit' ? 'text-green-500' : 'text-red-500'">
+                {{ transaction.transactionType === 'credit' ? '+' : '-' }}${{ transaction.transactionAmount }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upcoming Payments Section -->
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-indigo-800 text-white p-4 flex justify-between items-center">
+          <h2 class="text-xl font-semibold">Upcoming Payments</h2>
+          <button (click)="navigateToMonthlyTracker()" class="text-white hover:underline">
+            Monthly Tracker <i class="fas fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+        <div class="p-4">
+          <div *ngIf="upcomingPayments.length === 0" class="text-center py-4 text-gray-500">
+            No upcoming payments.
+          </div>
+          <div *ngFor="let payment of upcomingPayments" class="border-b last:border-b-0 py-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="font-semibold text-gray-800">{{ payment.groupName }}</h3>
+                <p class="text-sm text-gray-600">Due: {{ payment.dueDate }}</p>
+              </div>
+              <span class="text-red-500">${{ payment.amount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Access Buttons -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
+      <button (click)="navigateToGroups()" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition flex flex-col items-center">
+        <div class="bg-blue-100 p-4 rounded-full mb-4">
+          <i class="fas fa-users text-blue-500 text-xl"></i>
+        </div>
+        <h3 class="font-semibold text-gray-800">My Groups</h3>
+      </button>
+
+      <button (click)="navigateToTransactions()" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition flex flex-col items-center">
+        <div class="bg-green-100 p-4 rounded-full mb-4">
+          <i class="fas fa-exchange-alt text-green-500 text-xl"></i>
+        </div>
+        <h3 class="font-semibold text-gray-800">My Transactions</h3>
+      </button>
+
+      <button (click)="navigateToMonthlyTracker()" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition flex flex-col items-center">
+        <div class="bg-purple-100 p-4 rounded-full mb-4">
+          <i class="fas fa-calendar-check text-purple-500 text-xl"></i>
+        </div>
+        <h3 class="font-semibold text-gray-800">Monthly Tracker</h3>
+      </button>
+
+      <button (click)="navigateToGroupTransactions()" class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition flex flex-col items-center">
+        <div class="bg-yellow-100 p-4 rounded-full mb-4">
+          <i class="fas fa-chart-line text-yellow-500 text-xl"></i>
+        </div>
+        <h3 class="font-semibold text-gray-800">Group Transactions</h3>
+      </button>
+    </div>
+  </div>
+</div>

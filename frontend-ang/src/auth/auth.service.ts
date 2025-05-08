@@ -19,7 +19,7 @@ export class AuthService {
   public userSubject = new BehaviorSubject<User | null>(null);
   user$ = this.userSubject.asObservable();
 
-  private apiBaseUrl = 'http://localhost:3000/api'; // Centralize API base URL
+  private apiBaseUrl = 'http://localhost:3001/api'; // Centralize API base URL
 
   constructor(private http: HttpClient) {
     const token = localStorage.getItem('authToken');
@@ -29,18 +29,25 @@ export class AuthService {
     }
   }
 
+  // If your user service uses a different endpoint structure
   async fetchUser(userEmail: string, token: string): Promise<void> {
     try {
       const response = await firstValueFrom(
-        this.http.get<User>(`${this.apiBaseUrl}/users/email/${userEmail}`, {
+        this.http.get<User>(`http://localhost:3002/api/users/email/${userEmail}`, {
           headers: new HttpHeaders({
             Authorization: `Bearer ${token}`,
           }),
         })
       );
       this.userSubject.next(response);
-    } catch (error) {
-      console.error('Fetching user failed:', error);
+    } catch (error: any) {
+      if (error.status === 404) {
+        console.error('User endpoint not found. Check if user service is running on the correct port.');
+      } else if (error.status === 401) {
+        console.error('Authentication failed. Token may be invalid.');
+      } else {
+        console.error('Fetching user failed:', error);
+      }
       this.logout(); // Clear local data if fetching user fails
     }
   }

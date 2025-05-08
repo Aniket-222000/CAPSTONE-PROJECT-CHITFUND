@@ -166,6 +166,14 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
       res.status(404).json({ message: 'Group not found' });
       return;
     }
+    
+    // Check if warnings array exists and has content
+    if (!group.warnings || group.warnings.length === 0) {
+      // Return empty array with proper structure instead of null
+      res.status(200).json([]);
+      return;
+    }
+    
     res.status(200).json(group.warnings);
   };
   
@@ -361,63 +369,73 @@ export const getByGroupId = async (req: Request, res: Response) => {
 };
 
   export const handleMissedPayment = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { groupId, userId, missedAmount } = req.body;
-  
-      const group = await Group.findOne({ groupId });
-      if (!group) {
-res.status(404).json({ message: 'Group not found' });
-return;
+      try {
+        const { groupId, userId, missedAmount } = req.body;
+    
+        const group = await Group.findOne({ groupId });
+        if (!group) {
+          res.status(404).json({ message: 'Group not found' });
+          
+          return;
+        }
+    
+        // Calculate penalty (10% of missed amount, capped at ₹2000)
+        const penaltyRate = 0.1;
+        const penaltyCap = 2000;
+        let penalty = missedAmount * penaltyRate;
+        penalty = Math.min(penalty, penaltyCap);
+    
+        // Record penalty
+        group.penalties.push({ userId, penalty });
+        
+        // Find existing warning or create new one
+        const existingWarning = group.warnings.find(w => w.userId === userId);
+        if (existingWarning) {
+          existingWarning.count = (existingWarning.count || 0) + 1;
+        } else {
+          group.warnings.push({ userId, count: 1, month: new Date().getMonth() + 1 });
+        }
+        
+        await group.save();
+    
+        // Log penalty activity
+        logActivity(
+          'PENALTY_APPLIED',
+          `Applied penalty of ₹${penalty} to member ${userId} for missing ₹${missedAmount}`,
+          (req.body.userId || 'anonymous'),
+          groupId
+        );
+    
+        // Fetch member and organizer data
+        const memberResp = await axios.get(`http://localhost:3002/api/users/${userId}`);
+        const member = memberResp.data;
+        const organizerResp = await axios.get(`http://localhost:3002/api/users/${group.organizerId}`);
+        const organizer = organizerResp.data;
+    
+        // Notify member
+        await sendEmail(
+          member.userEmail,
+          'Chit Fund: Missed Payment Penalty',
+          `Hello ${member.userName},\n\nYou missed your contribution of ₹${missedAmount}. A penalty of ₹${penalty} has been applied to your account.\n\nPlease pay at the earliest to avoid further action.`
+        );
+    
+        // Notify organizer
+        await sendEmail(
+          organizer.userEmail,
+          'Chit Fund Alert: Member Missed Payment',
+          `Hello ${organizer.userName},\n\nMember ${member.userName} (ID: ${userId}) missed their contribution of ₹${missedAmount} and was penalized ₹${penalty}.`
+        );
+    
+        res.status(200).json({ message: 'Penalty applied and notifications sent' });
+      } catch (error: any) {
+        console.error('Error in handleMissedPayment:', error);
+        if (error.response) {
+          console.error('Error response data:', error.response.data);
+          console.error('Error response status:', error.response.status);
+        }
+        res.status(500).json({ message: error.message || 'Internal server error' });
       }
-  
-      // Calculate penalty (10% of missed amount, capped at ₹2000)
-      const penaltyRate = 0.1;
-      const penaltyCap = 2000;
-      let penalty = missedAmount * penaltyRate;
-      penalty = Math.min(penalty, penaltyCap);
-  
-      // Record penalty
-      group.penalties.push({ userId, penalty });
-      await group.save();
-  
-      // Log penalty activity
-      logActivity(
-        'PENALTY_APPLIED',
-        `Applied penalty of ₹${penalty} to member ${userId} for missing ₹${missedAmount}`,
-        (req.body.userId || 'anonymous'),
-        groupId
-      );
-  
-      // Fetch member and organizer data
-      const memberResp = await axios.get(`http://localhost:3002/api/users/${userId}`);
-      const member = memberResp.data;
-      const organizerResp = await axios.get(`http://localhost:3002/api/users/${group.organizerId}`);
-      const organizer = organizerResp.data;
-  
-      // Notify member
-      await sendEmail(
-        member.userEmail,
-        'Chit Fund: Missed Payment Penalty',
-        `Hello ${member.userName},\n\nYou missed your contribution of ₹${missedAmount}. A penalty of ₹${penalty} has been applied to your account.\n\nPlease pay at the earliest to avoid further action.`
-      );
-  
-      // Notify organizer
-      await sendEmail(
-        organizer.userEmail,
-        'Chit Fund Alert: Member Missed Payment',
-        `Hello ${organizer.userName},\n\nMember ${member.userName} (ID: ${userId}) missed their contribution of ₹${missedAmount} and was penalized ₹${penalty}.`
-      );
-  
-      res.status(200).json({ message: 'Penalty applied and notifications sent' });
-    } catch (error: any) {
-      console.error('Error in handleMissedPayment:', error);
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-        console.error('Error response status:', error.response.status);
-      }
-      res.status(500).json({ message: error.message || 'Internal server error' });
-    }
-  };
+    };
   
 
 export const updateGroup = async(req:Request,res:Response)=>{
