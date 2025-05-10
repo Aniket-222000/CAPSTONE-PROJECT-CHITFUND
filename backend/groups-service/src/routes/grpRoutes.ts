@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { placeBid, runDraw, repay, getWarnings, removeMember,
     lateralRequest, lateralApprove, lateralPayment,
-    compensate, adjustBid, getStatus, getHistory,createGroup,getAllGroups,getByGroupId,handleMissedPayment,updateGroup,deleteGroup, addParticipant, getParticipantsOfGroup, requestToJoinGroup, getAllRequests, calculateChit, getOrganizerOfGroup, displayMonthlyPlan, 
+    compensate, adjustBid, getStatus, getHistory,createGroup,getAllGroups,getParticipantMonthlySummaryByUserId, getParticipantMonthlySummary, getByGroupId,handleMissedPayment,updateGroup,deleteGroup, addParticipant, getParticipantsOfGroup, requestToJoinGroup, getAllRequests, calculateChit, getOrganizerOfGroup, displayMonthlyPlan, 
     generateReport} from "../controllers/grpController";
 
 
@@ -53,4 +53,10 @@ router.post('/:groupId/plan', displayMonthlyPlan as any);
 // Add this route
 router.post('/:groupId/report', generateReport);
 
+//monthly summery
+// In your routes file (likely groupRoutes.ts)
+router.get('/:groupId/monthly-summary/:month', getParticipantMonthlySummary);
+
+// Add this new route for user-specific monthly summary
+router.get('/:groupId/monthly-summary/:month/user/:userId', getParticipantMonthlySummaryByUserId as any);
 export default router;
