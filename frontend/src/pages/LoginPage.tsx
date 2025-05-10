@@ -18,15 +18,19 @@ const LoginPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await login(formData.userEmail, formData.password); // Call login from context
+            const response = await login(formData.userEmail, formData.password); // Call login from context
             setSuccess(true); // Show success alert
             setError(null); // Clear any previous error
 
             // Hide success message after 3 seconds
             setTimeout(() => {
                 setSuccess(false);
-                navigate('/mygroups'); // Navigate to profile after successful login
-            }, 1000);
+                if (response?.user?.userRole === 'admin') {
+                    navigate('/admin'); 
+                } else {
+                    navigate('/mygroups'); // Navigate to profile after successful login
+                }
+            }, 3000); // Fixed the setTimeout duration here
         } catch (err) {
             setError('Login failed. Please check your credentials.');
             setSuccess(false); // Hide success alert on failure
@@ -55,13 +59,31 @@ const LoginPage: React.FC = () => {
                 <form onSubmit={handleSubmit}>
                     <div className="mb-4">
                         <label className="block text-sm font-semibold mb-2" htmlFor="userEmail">Email</label>
-                        <input type="email" name="userEmail" id="userEmail" value={formData.userEmail} onChange={handleChange} required className="w-full p-2 border rounded-md" />
+                        <input
+                            type="email"
+                            name="userEmail"
+                            id="userEmail"
+                            value={formData.userEmail}
+                            onChange={handleChange}
+                            required
+                            className="w-full p-2 border rounded-md"
+                        />
                     </div>
                     <div className="mb-4">
                         <label className="block text-sm font-semibold mb-2" htmlFor="password">Password</label>
-                        <input type="password" name="password" id="password" value={formData.password} onChange={handleChange} required className="w-full p-2 border rounded-md" />
+                        <input
+                            type="password"
+                            name="password"
+                            id="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            className="w-full p-2 border rounded-md"
+                        />
                     </div>
-                    <button type="submit" className="w-full bg-indigo-800 text-white p-2 rounded-md hover:bg-indigo-400">Login</button>
+                    <button type="submit" className="w-full bg-indigo-800 text-white p-2 rounded-md hover:bg-indigo-400">
+                        Login
+                    </button>
                 </form>
             </div>
         </div>

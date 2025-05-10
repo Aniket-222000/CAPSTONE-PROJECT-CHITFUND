@@ -6,7 +6,7 @@ import logo from '../assets/image (3).png';
 
 
 const Navbar: React.FC = () => {
-    const { isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, logout, user } = useAuth();
 
     const handleLogout = () => {
         logout(); // Call logout from context
@@ -24,6 +24,12 @@ const Navbar: React.FC = () => {
                     <><Link to="/mygroups" className="text-gray-300 hover:text-white">My Groups</Link>
                     <Link to="/mytransactions" className="text-gray-300 hover:text-white">My Transactions</Link>
                     <Link to="/profile" className="text-gray-300 hover:text-white">Profile</Link></>
+                )}
+
+                {isAuthenticated && user?.userRole === 'admin' && (
+                    <Link to="/admin" className="text-gray-300 hover:text-white">
+                        Admin Dashboard
+                    </Link>
                 )}
 
                 {isAuthenticated ? (
@@ -55,3 +61,4 @@ const Navbar: React.FC = () => {
 };
 
 export default Navbar;
+

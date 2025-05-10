@@ -58,10 +58,7 @@ const Profile: React.FC = () => {
                     onClick={handleEditProfile}
                     className="flex items-center justify-center mt-8 w-full bg-indigo-800 text-white p-3 rounded-lg shadow-md hover:bg-indigo-400 transition-colors duration-200"
                 >
-                    
-                    <FaUserEdit className="mr-2" />
-
-                    
+                    <span className="mr-2"><FaUserEdit /></span>
                     Edit Profile
                 </button>
             </div>

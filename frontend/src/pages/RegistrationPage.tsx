@@ -74,9 +74,9 @@ const RegistrationPage: React.FC = () => {
       setError('Please correct the errors in the form.');
       return;
     }
-
+// solomanvarghese007@gmail.com
     try {
-      const response = await axios.post('http://127.0.0.1:3000/api/auth/register', formData, {
+      await axios.post('http://localhost:3000/api/auth/register', formData, {
         headers: { 'Content-Type': 'application/json' },
         withCredentials: true,
       });

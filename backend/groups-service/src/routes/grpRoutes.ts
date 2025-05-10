@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { placeBid, runDraw, repay, getWarnings, removeMember,
     lateralRequest, lateralApprove, lateralPayment,
-    compensate, adjustBid, getStatus, getHistory,createGroup,getAllGroups,getByGroupId,handleMissedPayment,updateGroup,deleteGroup, addParticipant, getParticipantsOfGroup, requestToJoinGroup, getAllRequests, calculateChit, getOrganizerOfGroup, displayMonthlyPlan } from "../controllers/grpController";
+    compensate, adjustBid, getStatus, getHistory,createGroup,getAllGroups,getByGroupId,handleMissedPayment,updateGroup,deleteGroup, addParticipant, getParticipantsOfGroup, requestToJoinGroup, getAllRequests, calculateChit, getOrganizerOfGroup, displayMonthlyPlan, 
+    generateReport} from "../controllers/grpController";
 
 
 
@@ -48,5 +49,8 @@ router.get('/:groupId/history', getHistory);
 router.post('/calculateChit', calculateChit as any);
 router.get('/getOrganizer/:groupId', getOrganizerOfGroup as any);
 router.post('/:groupId/plan', displayMonthlyPlan as any);
+
+// Add this route
+router.post('/:groupId/report', generateReport);
 
 export default router;

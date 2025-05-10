@@ -1,0 +1,363 @@
+POST :  http://localhost:3001/api/auth/register
+JWT : NO Token needed
+{
+  "userName":"manikesh",
+  "userEmail":"manikesh@gmail.com",
+  "password":"manikesh123",
+  "userMobileNum":"1234569893",
+  "userAddress":"MH",
+  "userRole":"participant"
+}
+Response :
+{ "message": "User registered successfully" }
+
+Errors :
+400 if email or username already exists:
+{ "message": "Email already exists" }
+or
+{ "message": "Username already exists" }
+
+=================================================================================
+POST :  http://localhost:3001/api/auth/login
+JWT : NO Token needed
+{
+  "userEmail":"manikesh@gmail.com",
+  "password":"manikesh123",
+}
+Response :
+{
+    "message": "Login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyNyIsInVzZXJFbWFpbCI6Im1hbmlrZXNoQGdtYWlsLmNvbSIsInVzZXJSb2xlIjoicGFydGljaXBhbnQiLCJpYXQiOjE3NDY2MjA2MzcsImV4cCI6MTc0NjYyNDIzN30.a5BQ2E31uN9hEYk-8QD2Vk1wdLm69FhDsFKE1V0mhxM"
+}
+=================================================================================
+
+1] Get All Users
+GET : http://localhost:3002/api/users/all
+JWT : Any (participant / organizer / admin)
+Response : show the all users data 
+
+==================================================================================
+
+2] Get User by ID
+GET : http://localhost:3002/api/users/:userId
+JWT : Any
+Response : show that particular user info
+==================================================================================
+
+3] Get User by Email
+GET : http://localhost:3002/api/users/email/:userEmail
+
+4] Get User-ID by Username
+GET : http://localhost:3002/api/users/name/:userName
+
+5] Get List of Groups for a User
+GET : http://localhost:3002/api/users/groups/:userEmail
+Response : Show the group id
+
+==================================================================================
+
+6] Edit User Profile
+PUT : http://localhost:3002/api/users/editprofile/:userEmail
+{
+  "userName": "alice_updated",
+  "userAddress": "456 Oak St"
+}
+Response : show the updated data
+
+==================================================================================
+
+7] Respond to Join Request
+POST : http://localhost:3002/api/users/:groupId/join-request/:userId
+{ "action": "accept" }
+or
+{ "action": "reject" }
+Response:
+{ "message": "Request accepted successfully" }
+
+==================================================================================
+
+8] Add Group to User’s groupIds
+PATCH : http://localhost:3002/api/users/addGroup/:userEmail
+Request:
+{ "groupId": "group123" }
+Response : show the user added in the group
+
+==================================================================================
+
+9] Compute Chit Plan
+POST : http://localhost:3003/api/groups/calculateChit
+Request :
+{
+  "totalAmount": 300000,
+  "months": 30,
+  "members": 30,
+  "commission": 5
+}
+Response : show some calculated data
+
+=================================================================================
+
+GROUP CRUD OPERATION
+
+10] Create a New Group
+POST : http://localhost:3003/api/groups
+JWT : organizer / admin
+Resquest :
+{
+  "groupId":     "group2025",
+  "groupName":   "Silver Circle",
+  "groupType":   "rotating",
+  "interest":    5,
+  "organizerId": "user1",
+  "members":     5,
+  "duration":    30,
+  "totalAmount": 50000,
+  "ticketValue": 1000,
+  "description": "A 30-month rotating savings group for mutual financial support",
+  "startDate": "2024-07-01T00:00:00.000Z",
+  "endDate": "2025-06-30T00:00:00.000Z"
+}
+
+Response:
+show the group info with id n all and with the status active
+
+=================================================================================
+
+11]  Place a Bid
+POST http://localhost:3003/api/groups/:groupId/bid
+JWT : participant
+Request:
+{
+  "userId":   "userA",
+  "bidAmount":250000,
+  "month":     1
+}
+Response:
+{ "message": "Bid placed successfully" }
+
+=================================================================================
+
+12]  Run Monthly Draw
+POST : http://localhost:3003/api/groups/:groupId/draw
+JWT : organizer
+request:  { "month": 1 }
+response : {
+  "winner": {
+    "userId":   "userA",
+    "bidAmount":250000
+  },
+  "commission":   15000,
+  "distribution": [
+    { "userId":"user1","amount":1166.67 },
+    { "userId":"user2","amount":1166.67 },
+    …30 entries total…
+  ]
+}
+
+=================================================================================
+
+13] Record a Repayment
+POST : http://localhost:3003/api/groups/:groupId/repay
+JWT : Participant
+request:
+{
+  "userId": "userA",
+  "month":    2,
+  "amount": 10000
+}
+response: { "message": "Contribution recorded" }
+
+=================================================================================
+
+14] Apply Penalty for a Missed Payment
+POST http://localhost:3003/api/groups/missed-payment
+JWT : organizer
+request:
+{
+  "groupId":     "group123",
+  "memberId":    "userA",
+  "missedAmount":10000
+}
+response:
+{ "message": "Penalty applied and notifications sent" }
+
+=================================================================================
+
+15] Get Warning Counts
+GET http://localhost:3003/api/groups/:groupId/warnings
+JWT : organizer
+response: [
+  { "userId":"userA","month":2,"count":1 },
+  { "userId":"userB","month":3,"count":2 },
+  …
+]
+
+=================================================================================
+
+16] Remove Member After Three Warnings
+DELETE http://localhost:3003/api/groups/:groupId/members/:userId
+JWT : organizer
+response : { "message": "Member userA removed after 3 warnings" }
+
+=================================================================================
+
+17] Lateral-Member Join Request
+POST : http://localhost:3003/api/groups/:groupId/lateral/request
+JWT : participant
+request : { "userId": "userX" }
+response : { "message": "Lateral–member join request sent" }
+
+
+=================================================================================
+
+18] Approve Lateral-Member & Calculate Back-date Due
+POST :  http://localhost:3003/api/groups/:groupId/lateral/approve
+JWT : organizer
+request : { "userId": "userX" }
+response : {
+  "message":     "Lateral member approved",
+  "backdatedDue":20000
+}
+
+=================================================================================
+
+19] Record Back-dated Payment
+POST http://localhost:3003/api/groups/:groupId/lateral/payment
+JWT : participant
+request : {
+  "userId":    "userX",
+  "amountPaid":20000
+}
+response : { "message": "Back-dated payment recorded" }
+
+=================================================================================
+
+20] Organizer Compensates Shortfall
+POST http://localhost:3003/api/groups/:groupId/organizer/compensate
+JWT : organizer
+request : {
+  "month":  2,
+  "amount":10000
+}
+response : { "message": "Organizer compensated ₹10000 for month 2" }
+
+=================================================================================
+
+21] Organizer Adjusts a Bid
+POST : http://localhost:3003/api/groups/:groupId/organizer/adjust-bid
+JWT : organizer
+request : {
+  "userId":      "userA",
+  "month":        2,
+  "newBidAmount":260000
+}
+response : { "message": "Bid for month 2 adjusted to ₹260000" }
+
+=================================================================================
+
+22]  Get Current Group Status
+JWT : Any
+GET : http://localhost:3003/api/groups/:groupId/status
+response : {
+  "participants":   ["userA","userB",…],
+  "warnings":       […],
+  "penalties":      […],
+  "lateralMembers": […],
+  "balance":        25000
+}
+
+=================================================================================
+
+23] Get Chit-Fund History
+GET http://localhost:3003/api/groups/:groupId/history
+JWT : Any
+response : [
+  {
+    "month":           1,
+    "winner":          "userA",
+    "distribution":    […],
+    "missedPayments":  […],
+    "penalties":       […],
+    "warnings":        […]
+  },
+  {
+    "month":2, …  
+  },
+  …
+]
+
+=================================================================================
+
+24]  Create a Transaction
+POST : http://localhost:3004/api/transactions
+JWT : participant
+request :
+{
+  "transactionId": "txn_1234567890_1234",
+  "userId": "user7",
+  "groupId": "group2025",
+  "transactionAmount": 1000,
+  "transactionType": "credit",
+  "transactionDate": "2024-06-10T12:00:00.000Z",
+  "transactionFrom": "user7",
+  "transactionTo": "user1"
+}
+
+response :
+it show the data 
+
+=================================================================================
+
+
+25] Get All Transactions
+GET http://localhost:3004/api/transactions/all
+JWT : admin
+Response : array of all transaction documents.
+
+=================================================================================
+
+
+26] Get Transactions by User
+GET http://localhost:3004/api/transactions/find/user/:userId
+JWT : participant|admin
+response : that user’s transactions.
+
+=================================================================================
+
+
+25] Get Transactions by Group
+GET http://localhost:3004/api/transactions/find/group/:groupId
+JWT : organizer / admin
+Response : that group’s transactions.
+
+=================================================================================
+
+26] Get Transaction by ID
+GET http://localhost:3004/api/transactions/find/:transactionId
+Authorization: Bearer <token>   (roles: admin)
+
+=================================================================================
+
+
+27] Get by Type
+GET http://localhost:3004/api/transactions/find/type/:transactionType
+Authorization: Bearer <token>   (roles: admin)
+
+=================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
