@@ -554,38 +554,256 @@ export const getParticipantsOfGroup = async (req: Request, res: Response) => {
     }
 }
 
-export const calculateChit = (req: Request, res: Response) => {
-    const { totalAmount, months, members, commission } = req.body;
+// export const calculateChit = (req: Request, res: Response) => {
+//     const { totalAmount, months, members, commission } = req.body;
 
-    // Validate inputs
-    if (!totalAmount || !months || !members || totalAmount <= 0 || months <= 0 || members <= 0) {
-        return res.status(400).json({ message: "Please enter valid values for all fields." });
+//     // Validate inputs
+//     if (!totalAmount || !months || !members || totalAmount <= 0 || months <= 0 || members <= 0) {
+//         return res.status(400).json({ message: "Please enter valid values for all fields." });
+//     }
+
+//     const results: Array<any> = [];
+//     const Amount = totalAmount / members; // Amount paid monthly
+//     let interest = months / 200;
+//     let minAmount = totalAmount * (1 - interest); // Minimum bound (first person gets 70% of total)
+//     interest = 0;
+
+//     for (let month = 1; month <= months; month++) {
+//         interest += minAmount;
+//         const commissionAmount = (minAmount * commission) / 100;
+//         const amountGiven = minAmount - commissionAmount;
+
+//         results.push({
+//             month: month,
+//             amount: minAmount.toFixed(2),
+//             commission: commissionAmount.toFixed(2),
+//             amountGiven: amountGiven.toFixed(2),
+//         });
+
+//         minAmount += 0.01 * totalAmount; // Update minAmount for the next month
+//     }
+
+//     const totalProfit = totalAmount * months - interest;
+//     return res.status(200).json({ results, totalProfit });
+// };
+
+// ... existing code ...
+
+export const getParticipantMonthlySummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { groupId, month,userId } = req.params;
+    
+    // Find the group
+    const group = await Group.findOne({ groupId });
+    if (!group) {
+      res.status(404).json({ message: 'Group not found' });
+      return;
     }
-
-    const results: Array<any> = [];
-    const Amount = totalAmount / members; // Amount paid monthly
-    let interest = months / 200;
-    let minAmount = totalAmount * (1 - interest); // Minimum bound (first person gets 70% of total)
-    interest = 0;
-
-    for (let month = 1; month <= months; month++) {
-        interest += minAmount;
-        const commissionAmount = (minAmount * commission) / 100;
-        const amountGiven = minAmount - commissionAmount;
-
-        results.push({
-            month: month,
-            amount: minAmount.toFixed(2),
-            commission: commissionAmount.toFixed(2),
-            amountGiven: amountGiven.toFixed(2),
+    
+    // Get all participants
+    const participantIds = group.participants;
+    
+    // Prepare summary data for each participant
+    const summaryPromises = participantIds.map(async (userId) => {
+      try {
+        // Get user details from user service
+        const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`, {
+          headers: { 'Content-Type': 'application/json' }
         });
-
-        minAmount += 0.01 * totalAmount; // Update minAmount for the next month
-    }
-
-    const totalProfit = totalAmount * months - interest;
-    return res.status(200).json({ results, totalProfit });
+        const userData = userResponse.data;
+        
+        // Check if user has paid for this month
+        const hasPaid = group.contributions.some(
+          c => c.userId === userId && c.month === parseInt(month)
+        );
+        
+        // Get payment date if paid
+        const payment = group.contributions.find(
+          c => c.userId === userId && c.month === parseInt(month)
+        );
+        const datePaid = payment ? new Date(payment.timestamp).toISOString() : null;
+        
+        // Get warnings for this user
+        const warningObj = group.warnings.find(w => w.userId === userId);
+        const warningCount = warningObj ? warningObj.count : 0;
+        
+        // Calculate installment amount (total amount divided by duration)
+        const installmentAmount = group.totalAmount / group.duration;
+        
+        // Calculate remaining balance
+        // Sum all contributions by this user
+        const totalPaid = group.contributions
+          .filter(c => c.userId === userId)
+          .reduce((sum, c) => sum + c.amount, 0);
+        
+        // Total expected payment up to this month
+        const expectedPayment = installmentAmount * parseInt(month);
+        
+        // Remaining balance
+        const remainingBalance = expectedPayment - totalPaid;
+        
+        return {
+          userId,
+          userName: userData.userName,
+          hasPaid,
+          datePaid,
+          warningCount,
+          installmentAmount,
+          remainingBalance: remainingBalance > 0 ? remainingBalance : 0
+        };
+      } catch (error) {
+        console.error(`Error fetching data for user ${userId}:`, error);
+        return {
+          userId,
+          userName: "Unknown",
+          hasPaid: false,
+          datePaid: null,
+          warningCount: 0,
+          installmentAmount: group.totalAmount / group.duration,
+          remainingBalance: group.totalAmount / group.duration
+        };
+      }
+    });
+    
+    const summaryData = await Promise.all(summaryPromises);
+    
+    res.status(200).json({
+      groupId,
+      month,
+      participants: summaryData
+    });
+    
+  } catch (error) {
+    console.error('Error generating participant monthly summary:', error);
+    res.status(500).json({ 
+      message: 'Failed to generate monthly summary',
+      error: error instanceof Error ? error.message : 'An unknown error occurred'
+    });
+  }
 };
+
+export const getParticipantMonthlySummaryByUserId = async (req: Request, res: Response) => {
+  try {
+    const { groupId, month, userId } = req.params;
+    
+    // Find the group
+    const group = await Group.findOne({ groupId });
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+    
+    // Check if user is a participant in the group
+    if (!group.participants.includes(userId)) {
+      return res.status(404).json({ message: "User is not a participant in this group" });
+    }
+    
+    // Get user details
+    const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`);
+    const user = userResponse.data;
+    
+    // Get payment records for this month
+    const paymentRecords = group.contributions || [];
+    const monthlyRecords = paymentRecords.filter(record => 
+      record.month === parseInt(month) && record.userId === userId
+    );
+    
+    // Get warnings for this user
+    const warnings = group.warnings || [];
+    const userWarnings = warnings.filter(warning => warning.userId === userId);
+    
+    // Calculate installment amount
+    const installmentAmount = group.totalAmount / group.duration;
+    
+    // Check if user has paid for this month
+    const hasPaid = monthlyRecords.length > 0;
+    const datePaid = hasPaid ? monthlyRecords[0].timestamp : null;
+    
+    // Calculate remaining balance
+    const remainingBalance = hasPaid ? 0 : installmentAmount;
+    
+    const participantSummary = {
+      userId: user._id,
+      userName: user.userName,
+      hasPaid,
+      datePaid,
+      warningCount: userWarnings.length,
+      installmentAmount: parseFloat(installmentAmount.toFixed(2)),
+      remainingBalance: parseFloat(remainingBalance.toFixed(2))
+    };
+    
+    res.status(200).json({
+      groupId,
+      month,
+      participant: participantSummary
+    });
+    
+  } catch (error) {
+    console.error('Error fetching participant monthly summary:', error);
+    res.status(500).json({ message: "Failed to fetch participant monthly summary" });
+  }
+};
+// ... existing code ...
+
+export const calculateChit = async (req: Request, res: Response) => {
+  try {
+      const { totalAmount, months, members, commission } = req.body;
+      const { groupId } = req.params;
+
+      // Validate inputs
+      if (!totalAmount || !months || !members || !commission || 
+          totalAmount <= 0 || months <= 0 || members <= 0 || commission <= 0) {
+          return res.status(400).json({ message: "Please enter valid values for all fields." });
+      }
+
+      // Fetch bid amount from the API
+      const drawResponse = await axios.get(`http://localhost:3003/api/groups/${groupId}/draw`);
+      
+      if (!drawResponse.data || !drawResponse.data.winner || !drawResponse.data.winner.bidAmount) {
+          return res.status(400).json({ message: "Could not retrieve bid amount from draw API." });
+      }
+
+      const bidAmount = drawResponse.data.winner.bidAmount;
+
+      // Check if bid amount is less than total amount
+      if (bidAmount >= totalAmount) {
+          return res.status(400).json({ message: "Bid amount must be less than the fund value." });
+      }
+
+      // Calculate the difference between fund value and bid amount
+      const totalDifference = totalAmount - bidAmount;
+      
+      // Calculate commission amount
+      const totalCommission = (commission * totalDifference) / 100;
+      
+      // Calculate net amount to be distributed among members
+      const netAmount = totalDifference - totalCommission;
+      
+      // Calculate individual share for each member
+      const individualShare = netAmount / members;
+
+      // Prepare the results
+      const results = {
+          fundValue: totalAmount,
+          bidAmount: bidAmount,
+          totalDifference: totalDifference,
+          commissionPercentage: commission,
+          totalCommission: totalCommission,
+          netAmountDistributed: netAmount,
+          numberOfMembers: members,
+          individualShare: individualShare
+      };
+
+      return res.status(200).json(results);
+  } catch (error) {
+      console.error('Error calculating chit fund distribution:', error);
+      return res.status(500).json({ 
+          message: "Failed to calculate chit fund distribution", 
+          error: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+  }
+};
+
+
 
 export const getOrganizerOfGroup = async (req: Request, res: Response) => {
     try {
