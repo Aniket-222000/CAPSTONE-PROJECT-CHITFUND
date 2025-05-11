@@ -1,0 +1,300 @@
+<div class="p-6 bg-gray-100 min-h-screen">
+
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Participant Dashboard</h1>
+    <div class="flex space-x-4 items-end">
+      <button (click)="showgroups()"
+        class="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition hover:cursor-pointer">View
+        Available Group</button>
+      <!-- <button (click)="showgroups()"
+        class="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition hover:cursor-pointer">View
+        lateral Group</button> -->
+
+      <button (click)="showuser()"
+        class="bg-gray-800 p-2 rounded-full text-white hover:bg-gray-700 transition hover:cursor-pointer">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M5.121 17.804A9 9 0 1117.804 5.121M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" *ngIf="showuserprofile==false && usershow==false">
+    <div class="bg-white p-4 shadow rounded text-center">
+      <p class="text-gray-600">Total Chit Groups</p>
+      <p class="text-xl font-bold">{{totalGroups}}</p>
+    </div>
+    <div class="bg-white p-4 shadow rounded text-center">
+      <p class="text-gray-600">Total Paid Amount</p>
+      <p class="text-xl font-bold">{{totalPaid}}</p>
+    </div>
+    <div class="bg-white p-4 shadow rounded text-center">
+      <label for="groupSelect" class="block text-lg font-medium text-gray-600 mb-1">
+        Select Group
+      </label>
+
+      <select id="groupSelect" [(ngModel)]="selectedOption" (change)="onOptionChange()"
+        class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 bg-white">
+
+        <option *ngFor="let option of options" [value]="option">{{ option }}</option>
+      </select>
+    </div>
+
+    <div class="bg-white p-4 shadow rounded text-center">
+      <p class="text-gray-600">Current Auction Status</p>
+      <p class="text-xl font-bold text-green-500">Upcoming</p>
+    </div>
+  </div>
+
+  <div class="bg-white p-4 shadow rounded mb-6" *ngIf="showuserprofile==false && usershow==false&&setViewUser==false">
+    <h2 class="text-lg font-semibold mb-4">My Chit Groups</h2>
+    <table class="w-full text-sm text-left">
+      <thead class="bg-gray-200 text-gray-700">
+        <tr>
+          <th class="px-4 py-2">Group Name</th>
+          <th class="px-4 py-2">Total Amount</th>
+          <th class="px-4 py-2">Monthly Amount</th>
+          <th class="px-4 py-2">Start Date</th>
+          <th class="px-4 py-2">End Date</th>
+          <th class="px-4 py-2">Interest</th>
+          <th class="px-4 py-2">Eligible Bid Amount</th>
+          <th class="px-4 py-2">Status</th>
+          <th class="px-4 py-2">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let user of userGroups;let index=index">
+          <tr class="border-t">
+            <td class="px-4 py-2">{{user.groupName}}</td>
+            <td class="px-4 py-2">{{user.totalAmount}}</td>
+            <td class="px-4 py-2">₹{{user.ticketValue}}</td>
+            <td class="px-4 py-2">{{user.startDate|date}}</td>
+            <td class="px-4 py-2">{{user.endDate|date}}</td>
+            <td class="px-4 py-2">{{user.interest}}</td>
+            <td class="px-4 py-2">{{user.totalAmount-(user.totalAmount*(user.interest/100))}}</td>
+            <td class="px-4 py-2 text-green-600">{{user.status}}</td>
+            <td class="px-4 py-3 text-green-600"> <button (click)="ViewUserGroup(user.groupName)"
+                class="bg-yellow-500 text-white px-3 py-1 rounded transition hover:cursor-pointer hover:bg-yellow-600">View</button>
+            </td>
+          </tr>
+        </ng-container>
+        <tr class="border-t">
+      </tbody>
+    </table>
+  </div>
+
+
+  <div class="bg-white p-4 shadow rounded" *ngIf="showuserprofile==false && usershow==false && setViewUser==false">
+    <h2 class="text-lg font-semibold mb-4">Payment History</h2>
+    <!-- <table class="w-full text-sm text-left">
+      <thead class="bg-gray-200 text-gray-700">
+        <tr>
+          <th class="px-4 py-2">Date</th>
+          <th class="px-4 py-2">Amount</th>
+          <th class="px-4 py-2">Mode</th>
+          <th class="px-4 py-2">Receipt</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t">
+          <td class="px-4 py-2">06/01/2024</td>
+          <td class="px-4 py-2">₹10,000</td>
+          <td class="px-4 py-2">Online</td>
+          <td class="px-4 py-2 text-blue-500 hover:underline cursor-pointer">Download</td>
+        </tr>
+        <tr class="border-t">
+          <td class="px-4 py-2">05/01/2024</td>
+          <td class="px-4 py-2">₹10,000</td>
+          <td class="px-4 py-2">Online</td>
+          <td class="px-4 py-2 text-blue-500 hover:underline cursor-pointer">Download</td>
+        </tr>
+      </tbody>
+    </table> -->
+  </div>
+  <div class="max-w-3xl mx-auto mt-0 bg-white shadow-lg rounded-xl p-6" *ngIf="showuserprofile==true">
+    <div class="flex items-center justify-between border-b pb-4 mb-6">
+      <div class="flex items-center space-x-4">
+        <img src="https://i.pravatar.cc/100" alt="User avatar" class="w-24 h-24 rounded-full border" />
+        <div>
+          <h2 class="text-2xl font-semibold text-gray-800">{{userName}}</h2>
+          <p class="text-gray-500">{{userRole}}</p>
+        </div>
+      </div>
+      <button (click)="showuser()"
+        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition hover:cursor-pointer">
+        Cancel
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label class="block text-gray-600">User Id</label>
+        <p class="text-gray-900 font-medium">{{userId}}</p>
+      </div>
+      <div>
+        <label class="block text-gray-600">Email</label>
+        <p class="text-gray-900 font-medium">{{userEmail}}</p>
+      </div>
+      <div>
+        <label class="block text-gray-600">Phone</label>
+        <p class="text-gray-900 font-medium">{{userNumber}}</p>
+      </div>
+
+      <div>
+        <label class="block text-gray-600">Address</label>
+        <p class="text-gray-900 font-medium">{{userAddress}}</p>
+      </div>
+    </div>
+  </div>
+  <div class="max-w-3xl mx-auto flex flex-col mt-0 bg-gray-300 shadow-lg rounded-xl p-6" *ngIf="usershow==true">
+
+    <div class="grid p-4 sm:grid-cols-2 md:grid-cols-3 gap-4" *ngIf="showdetails === false">
+      <div class="cursor-pointer bg-white p-6 rounded-lg shadow hover:bg-blue-50 transition" *ngFor="let i of groups">
+        <h2 class="text-lg font-semibold text-gray-800">{{ i.groupName }}</h2>
+        <p class="text-sm text-gray-500">{{ i.description}}</p>
+        <button (click)="showgroupdetails(i.groupName)"
+          class="text-sm bg-blue-100 mt-6 text-black px-3 py-1 rounded hover:bg-blue-600 transition hover:cursor-pointer">More
+          ...</button>
+
+      </div>
+    </div>
+    <div *ngIf="showdetails === true"
+      class="max-w-sm mx-auto mt-6 p-6 bg-white rounded-2xl shadow-xl border border-gray-200 transition transform hover:scale-105">
+      <button (click)="showdetails = false"
+        class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition hover:cursor-pointer"
+        aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+      <h2 class="text-xl font-bold text-gray-800 mb-2">{{ groupName }}</h2>
+
+      <div class="space-y-1">
+        <p class="text-base text-gray-600"><span class="font-medium text-gray-700">Total Amount:</span> {{ totalamount
+          }}</p>
+        <p class="text-base text-gray-600"><span class="font-medium text-gray-700">Interest:</span> {{ interest }}</p>
+        <p class="text-base text-gray-600"><span class="font-medium text-gray-700">Monthly Amount:</span> {{
+          monthlyamount }}</p>
+      </div>
+
+      <button (click)="sendRequestToOrganizer(groupName)"
+        class="mt-5 w-full text-black bg-blue-300 hover:bg-blue-600 font-medium py-2 px-4 rounded-lg transition hover:cursor-pointer ease-in-out duration-300">
+        Request to Join Group
+      </button>
+    </div>
+
+  </div>
+  <div *ngIf="showcreategrouprequest"
+    class="fixed inset-0 bg-gray-100 bg-opacity-50 flex items-center justify-center z-50" @fadeInOut>
+    <div
+      class="bg-white rounded-2xl shadow-xl p-6 w-80 transform transition-transform duration-300 scale-100 animate-slide-in">
+      <div class="flex flex-col items-center">
+        <svg class="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" stroke-width="2"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <h2 class="text-xl font-semibold text-green-600 mb-2">Join Request Sent Successfully. </h2>
+
+        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition hover:cursor-pointer"
+          (click)="closeSuccessModal()">
+          Ok
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="bg-white p-4 shadow rounded mb-6 relative" *ngIf="setViewUser == true">
+    <h1 class="text-black">{{groupName}}</h1>
+    <!-- Close Button -->
+    <button (click)="setViewUser = false" class="absolute top-2 right-2 text-gray-500 hover:text-red-600"
+      aria-label="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+        class="w-5 h-5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+    <div class="flex flex-wrap gap-3 mt-6">
+      
+      <button  *ngFor="let month of months;let index=index" (click)="fetchDetails(index);"
+        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+        {{ month }}
+      </button>
+      <table class="w-full table-auto border" *ngIf="viewSummary==true">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="px-4 py-2">Month</th>
+            <th class="px-4 py-2">Installment</th>
+            <th class="px-4 py-2">Status</th>
+            <th class="px-4 py-2">Date Paid</th>
+            <th class="px-4 py-2">Remaining</th>
+            <th class="px-4 py-2">Warnings</th>
+            <th class="px-4 py-2">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of matchsummary">
+            <td class="px-4 py-2">{{ item.month }}</td>
+            <td class="px-4 py-2">₹{{ item.participant.installmentAmount.toFixed(2) }}</td>
+            <td class="px-4 py-2">
+              <span [class.text-green-600]="item.participant.hasPaid" [class.text-red-600]="!item.hasPaid">
+                {{ item.participant.hasPaid ==true? 'Paid' : 'Unpaid' }}
+              </span>
+            </td>
+            <td class="px-4 py-2">{{ item.participant.datePaid !=null ? (item.participant.datePaid | date) : '-' }}</td>
+            <td class="px-4 py-2">₹{{ item.participant.remainingBalance.toFixed(2) }}</td>
+            <td class="px-4 py-2">{{ item.participant.warningCount }}</td>
+            
+            <td class="px-4 py-2">
+              <button *ngIf="item.participant.hasPaid" (click)="placeBid(item.groupId,item.month,item.participant.installmentAmount.toFixed(2))" class="px-4 py-2 bg-blue-600 mr-5 text-white rounded-md hover:bg-blue-700 transition">Place Bid</button>
+    
+              <button  (click)="payAmount1(item.groupId,item.month,item.participant.installmentAmount.toFixed(2))" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"> {{ item.participant.hasPaid ? 'Get Receipt' : 'Pay' }}</button></td>
+            <div *ngIf="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div class="bg-white p-6 rounded shadow-md w-80">
+                <h2 class="text-lg font-semibold mb-4">Confirm Payment</h2>
+                <p class="mb-4">Payment done for month  <strong>{{ item.month }}</strong></p>
+                <p class="mb-4">Paid amount is  <strong>{{ item.participant.installmentAmount.toFixed(2) }}</strong></p>
+                <div class="flex justify-end gap-2">
+                   <button (click)="showConfirmModal = false" class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Ok</button>
+                </div>
+              </div>
+            </div>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Payment Confirmation Modal -->
+
+
+    </div>
+    <!-- <table class="w-full text-sm text-left">
+<table class="w-full table-auto border">
+  <thead class="bg-gray-100">
+    <tr>
+      <th class="px-4 py-2">Month</th>
+      <th class="px-4 py-2">Installment</th>
+      <th class="px-4 py-2">Status</th>
+      <th class="px-4 py-2">Date Paid</th>
+      <th class="px-4 py-2">Remaining</th>
+      <th class="px-4 py-2">Warnings</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let item of monthlyData">
+      <td class="px-4 py-2">{{ item.month }}</td>
+      <td class="px-4 py-2">₹{{ item.installmentAmount.toFixed(2) }}</td>
+      <td class="px-4 py-2">
+        <span [class.text-green-600]="item.hasPaid" [class.text-red-600]="!item.hasPaid">
+          {{ item.hasPaid ? 'Paid' : 'Unpaid' }}
+        </span>
+      </td>
+      <td class="px-4 py-2">{{ item.datePaid ? (item.datePaid | date) : '-' }}</td>
+      <td class="px-4 py-2">₹{{ item.remainingBalance.toFixed(2) }}</td>
+      <td class="px-4 py-2">{{ item.warningCount }}</td>
+    </tr>
+  </tbody>
+</table>-->
+
+  </div>
+</div>

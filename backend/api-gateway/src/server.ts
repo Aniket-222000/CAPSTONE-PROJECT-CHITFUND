@@ -3,7 +3,8 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateJWT, authorizeRole } from './middleware/authMiddleware';
 import { UserRole } from './models/User';
 import cors from 'cors';
-
+import dotenv from 'dotenv';
+dotenv.config();
 const app = express();
 const port = 3000;
 
@@ -18,7 +19,7 @@ app.options('*', cors());
 
 //app.use('/api/auth', createProxyMiddleware({ target: 'http://localhost:3001', changeOrigin: true }));
 app.use("/api/auth", createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL || "http://localhost:3001",
+    target: process.env.AUTH_SERVICE_URL || "http://localhost:3001/api/auth",
     changeOrigin: true,
     pathRewrite: { "^/api/auth": "/api/auth" }
   }));

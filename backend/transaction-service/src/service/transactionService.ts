@@ -126,9 +126,9 @@ export class TransactionService {
     groupId: string;
     transactionAmount: number;
     transactionDate?: Date;
-    transactionFrom: string;
+
   }): Promise<{ debit: ITransaction; credit: ITransaction }> {
-    const { userId, groupId, transactionAmount, transactionDate, transactionFrom } = data;
+    const { userId, groupId, transactionAmount, transactionDate } = data;
 
     // Fetch organizer
     const grpRes = await axios.get(`${this.groupsUrl}/getOrganizer/${groupId}`);
@@ -151,7 +151,7 @@ export class TransactionService {
       transactionTo: groupId,
     });
     logActivity('CREATE_DEBIT', `Created debit ${debitId}`, userId, groupId);
-
+    console.log("created")
     // Create credit
     const credit = await TransactionModel.create({
       transactionId: creditId,
@@ -161,7 +161,7 @@ export class TransactionService {
       userId: organizerId,
       groupId,
       transactionFrom: groupId,
-      transactionTo: organizerId,
+      transactionTo: userId,
     });
     logActivity('CREATE_CREDIT', `Created credit ${creditId}`, organizerId, groupId);
 
@@ -169,11 +169,11 @@ export class TransactionService {
     // Notify user
     const userRes = await axios.get(`${this.usersUrl}/${userId}`);
     console.log("hello"); // Debugging statement
-    await sendEmail(userRes.data.userEmail, 'Contribution Received', `Your payment of ₹${transactionAmount} is recorded.`);
+     sendEmail(userRes.data.userEmail, 'Contribution Received', `Your payment of ₹${transactionAmount} is recorded.`);
 
     // Notify organizer
     const orgRes = await axios.get(`${this.usersUrl}/${organizerId}`);
-    await sendEmail(orgRes.data.userEmail, 'New Contribution', `User ${userRes.data.userName} paid ₹${transactionAmount}.`);
+     sendEmail(orgRes.data.userEmail, 'New Contribution', `User ${userRes.data.userName} paid ₹${transactionAmount}.`);
 
     return { debit, credit };
   }

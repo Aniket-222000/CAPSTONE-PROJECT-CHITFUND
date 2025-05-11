@@ -1,0 +1,32 @@
+<!-- Navbar -->
+<nav class="flex items-center justify-evenly p-4 shadow bg-transparent">
+    <div class="flex items-center space-x-2">
+      <img src="background.png" alt="Savory" class="h-8 w-8" />
+      <span class="font-bold text-xl">Savory Chit Fund Manager</span>
+    </div>
+    <div class="flex flex-row gap-[16px]">
+      <a class="font-medium text-blue-600 border-b-2 border-blue-600" href="#">Dashboard</a>
+      <a class="font-medium text-gray-600 hover:text-blue-600" href="#">Help and Support</a>
+      <a class="font-medium text-gray-600 hover:text-blue-600" href="#">Logout</a>
+    </div>
+    <div class="space-x-3 flex flex-row ">
+      <button (click)="signup()" class="flex items-center px-4 py-1 border rounded-lg text-blue-700 hover:cursor-pointer border-blue-700 hover:bg-blue-50">
+        <span class="mr-1">📥</span> Sign Up
+      </button>
+      <button (click)="signin()" class="flex items-center px-4 py-1 bg-blue-600 text-white rounded-lg hover:cursor-pointer hover:bg-blue-700">
+        <span class="mr-1">🔐</span> Sign In
+      </button>
+    </div>
+  </nav>
+  
+  <!-- Hero Section -->
+  <div class="relative bg-cover   h-[520px]" style="background-image: url('background.png');">
+    <div class="absolute inset-0 bg-black opacity-40"></div>
+    <div class="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-4">
+      <h1 class="text-4xl font-bold md:text-5xl mb-4">Effortless Chit Management</h1>
+      <p class="text-lg md:text-xl mb-6">Simplify your chit fund operations and maximize returns with ease</p>
+      <button class="bg-blue-600 px-6 py-2 rounded-md text-white hover:bg-blue-700 hover:cursor-pointer">
+        Get Started
+      </button>
+    </div>
+  </div>

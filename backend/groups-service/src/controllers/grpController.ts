@@ -139,6 +139,7 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
   
   // 3. Record repayment
   export const repay = async (req: Request, res: Response): Promise<void> => {
+    console.log("inside gorup pay")
     const { groupId } = req.params;
     const { userId, month, amount } = req.body;
     try {
@@ -154,22 +155,34 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
       // Create transaction record
       try {
         await axios.post('http://localhost:3004/api/transactions', {
-          userId,
-          groupId,
-          amount,
+          userId:userId,
+          groupId:groupId,
+          transactionAmount:amount,
           type: 'REPAYMENT',
           description: `Repayment for month ${month}`,
+          transactionFrom:userId,
+          transactionTo:groupId,
           timestamp: new Date()
         });
       } catch (transactionErr) {
         console.error('Error creating transaction record:', transactionErr);
         // Continue execution even if transaction creation fails
       }
-  
+      console.log("Aftr transactoion")
       logActivity('REPAY', `User ${userId} repaid ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
       res.status(200).json({ message: 'Contribution recorded' });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      return;
+    } catch (transactionErr: any) {
+      if (transactionErr.response) {
+        // The server responded with a status code outside the 2xx range
+        console.error('Transaction service error response:', transactionErr.response.status, transactionErr.response.data);
+      } else if (transactionErr.request) {
+        // The request was made but no response was received
+        console.error('No response from transaction service:', transactionErr.request);
+      } else {
+        // Something else went wrong
+        console.error('Axios setup error:', transactionErr.message);
+      }
     }
   };
   
@@ -464,7 +477,8 @@ export const updateGroup = async(req:Request,res:Response)=>{
 
 export const deleteGroup = async(req:Request,res:Response)=>{
     try{
-        Group.deleteOne({groupName:req.params.groupName});
+        await Group.deleteOne({groupName:req.params.groupName});
+        
         res.status(200).json({message:"Deleted successfully"});
     }catch(error){
         res.status(400).json({message:error});
@@ -514,7 +528,7 @@ export const getAllRequests  = async (req: Request, res: Response) => {
 
 export const addParticipant = async(req:Request, res:Response)=>{
     try{
-        const group = await Group.findOne({groupId:req.params.groupId});
+        const group = await Group.findOne({groupName:req.params.groupName});
         if(!group){
             return res.status(404).json({message:"Group not found"});
         }
@@ -534,11 +548,12 @@ export const addParticipant = async(req:Request, res:Response)=>{
 }
 
 
-
+updateGroup
 export const getParticipantsOfGroup = async (req: Request, res: Response) => {
     try {
         // Find the group by groupId
-        const group = await Group.findOne({ groupId: req.params.groupId });
+        const group = await Group.findOne({ groupName: req.params.groupName });
+        console.log(group);
         if (!group) {
             return res.status(404).json({ message: "Group not found" });
         }
@@ -715,11 +730,16 @@ export const getParticipantMonthlySummaryByUserId = async (req: Request, res: Re
     // Get user details
     const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`);
     const user = userResponse.data;
-    
+    const acutalMonth=parseInt(month)-1;
     // Get payment records for this month
     const paymentRecords = group.contributions || [];
-    const monthlyRecords = paymentRecords.filter(record => 
-      record.month === parseInt(month) && record.userId === userId
+    console.log("paymentRecords ,",paymentRecords);
+    const monthlyRecords = paymentRecords.filter(record => {
+
+;
+      console.log(record.userId,"userId",userId);
+      return record.month == month && record.userId == userId;
+    }
     );
     
     // Get warnings for this user
@@ -731,16 +751,18 @@ export const getParticipantMonthlySummaryByUserId = async (req: Request, res: Re
     
     // Check if user has paid for this month
     const hasPaid = monthlyRecords.length > 0;
+    console.log(hasPaid)
+    console.log(monthlyRecords,"monthly")
     const datePaid = hasPaid ? monthlyRecords[0].timestamp : null;
-    
+    console.log(datePaid)
     // Calculate remaining balance
     const remainingBalance = hasPaid ? 0 : installmentAmount;
     
     const participantSummary = {
       userId: user._id,
       userName: user.userName,
-      hasPaid,
-      datePaid,
+      hasPaid:hasPaid,
+      datePaid:datePaid,
       warningCount: userWarnings.length,
       installmentAmount: parseFloat(installmentAmount.toFixed(2)),
       remainingBalance: parseFloat(remainingBalance.toFixed(2))

@@ -23,7 +23,7 @@ const Counter = mongoose.model('Counter', counterSchema);
 
 const userSchema = new Schema<IUser>({
   userId: { type: String, unique: true },
-  userName: { type: String, required: true, unique: true },
+  userName: { type: String, required: true },
   userEmail: { type: String, required: true, unique: true, index: true },
   password: { type: String, required: true, select: false },
   userMobileNum: { type: String, required: true },

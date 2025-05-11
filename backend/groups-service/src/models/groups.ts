@@ -15,7 +15,8 @@ export interface IGroup extends Document {
   joinRequests: string[];
   monthlyDraw: string[];
   description: string;
-
+  startDate:Date;
+  endDate:Date;
   // New fields for chit-fund features
   penalties: Array<{ userId: string; penalty: number }>;
   lateralRequests: string[];
@@ -33,7 +34,7 @@ export interface IGroup extends Document {
 const groupSchema = new mongoose.Schema({
   groupId: { type: String, required: true, unique: true },
   groupName: { type: String, required: true, unique: true },
-  groupType: { type: String, required: true },
+  groupType: { type: String },
   interest: { type: Number, required: true },
   organizerId: { type: String, required: true },
   members: { type: Number, required: true },
@@ -113,8 +114,7 @@ const groupSchema = new mongoose.Schema({
   ],
   startDate: {
     type: Date,
-    required: true,
-    default: Date.now
+    required: true
   },
   endDate: {
     type: Date,
@@ -136,7 +136,7 @@ groupSchema.virtual('status').get(function() {
   const endDate = new Date(creationDate);
   endDate.setMonth(endDate.getMonth() + this.duration);
   
-  if (now < creationDate) {
+  if (now < this.startDate) {
     return 'pending';
   } else if (now > endDate) {
     return 'closed';

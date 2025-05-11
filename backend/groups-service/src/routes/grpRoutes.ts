@@ -20,13 +20,13 @@ router.put('/:groupId', updateGroup);
 
 router.delete('/:groupName', deleteGroup);
 
-router.get('/:groupId/participants/:userId', addParticipant as any);
+router.get('/:groupName/participants/:userId', addParticipant as any);
 
 router.post('/request',requestToJoinGroup as any);
 
 router.get('/:groupId/requests',getAllRequests as any)
 
-router.get('/:groupId/participants', getParticipantsOfGroup as any);
+router.get('/:groupName/participants', getParticipantsOfGroup as any);
 
 // New chit-fund features
 router.post('/:groupId/bid', placeBid);

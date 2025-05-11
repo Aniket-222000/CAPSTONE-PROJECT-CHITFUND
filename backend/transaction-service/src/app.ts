@@ -30,7 +30,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+app.use(cors({ origin: process.env.CORS_ORIGIN}));
 app.use('/api/transactions', transactionRoutes);
+app.get('/api/ping', (req, res) =>{ res.send('pong')});
+
 connectDB();
 export default app;

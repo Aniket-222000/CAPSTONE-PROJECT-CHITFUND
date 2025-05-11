@@ -4,11 +4,14 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
+import { connectDB } from './config/db';
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
+
+connectDB();
 
 // Middleware
 app.use(cors({

@@ -1,0 +1,267 @@
+<div class="flex items-center justify-center flex-row min-h-screen bg-black-500  border overflow-hidden rounded-lg">
+
+  <div class=" bg-gray-800 flex-shrink h-[500px] text-white w-64 flex flex-col p-4 ">
+    <h2 class="text-xl font-bold mb-6">Organizer</h2>
+    <nav class="flex flex-col gap-4">
+      <a (click)="selectedMenu = 'Dashbaord';request=false;showParticipants=false;showGroup=false" [ngClass]="{
+            'bg-gray-700 text-white': selectedMenu === 'Dashbaord',
+            'hover:bg-gray-700': selectedMenu !== 'Dashbaord'
+          }" class="p-2 rounded transition hover:cursor-pointer">Dashboard</a>
+
+      <a (click)="selectedMenu = 'Requests'; showrequests();showParticipants=false" [ngClass]="{
+            'bg-gray-700 text-white': selectedMenu === 'Requests',
+            'hover:bg-gray-700': selectedMenu !== 'Requests'
+          }" class="p-2 rounded transition hover:cursor-pointer">Requests</a>
+      <a (click)="selectedMenu = 'Participants';setParticipants();request=false" [ngClass]="{
+          'bg-gray-700 text-white': selectedMenu === 'Participants',
+          'hover:bg-gray-700': selectedMenu !== 'Participants'
+        }" class="p-2 rounded transition hover:cursor-pointer">Participants</a>
+      <a (click)="selectedMenu = 'group';setGroups();request=false;showParticipants=false" [ngClass]="{
+          'bg-gray-700 text-white': selectedMenu === 'group',
+          'hover:bg-gray-700': selectedMenu !== 'group'
+        }" class="p-2 rounded transition hover:cursor-pointer">Groups</a>
+      <a class="hover:bg-gray-700 p-2 rounded transition hover:cursor-pointer">Auctions</a>
+      <a class="hover:bg-gray-700 p-2 rounded transition hover:cursor-pointer">Reports</a>
+      <a class="hover:bg-gray-700 p-2 rounded transition hover:cursor-pointer">Settings</a>
+    </nav>
+  </div>
+
+  <div class="p-6 flex-1 bg-gray-50" *ngIf="showcreategroup==false && showGroup==false && request==false&&showParticipants==false">
+
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">Organizer Dashboard</h1>
+      <div class="w-10 h-10 bg-gray-300 rounded-full"></div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-white p-4 rounded shadow">
+        <p class="text-sm text-gray-500">Active Chit Fund Groups</p>
+        <p class="text-2xl font-bold">{{length}}</p>
+      </div>
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-semibold mb-2">Manage Chit Groups</h2>
+        <button (click)="createGroup()"
+          class="bg-blue-600 text-white px-4 py-2 rounded transition hover:cursor-pointer">Create New Group</button>
+      </div>
+      <!-- <div class="bg-white p-4 rounded shadow">
+          <p class="text-sm text-gray-500">Upcoming Auctions</p>
+          <p class="text-2xl font-bold">3</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <p class="text-sm text-gray-500">Pending Actions</p>
+          <p class="text-2xl font-bold">$150,000</p>
+        </div> -->
+    </div>
+
+    <div class="grid grid-cols-1 w-[1000px] gap-4">
+
+
+
+      <!-- Panel 2 -->
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-semibold mb-2">Ongoing Chit Fund Cycles</h2>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-500">
+              <th>Name</th>
+              <th>Participants</th>
+              <th>Total Funds</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <tr *ngFor="let i of groups;let index = index">
+              <td>{{ i.groupName }}</td>
+              <td>{{i.members}}</td>
+              <td>{{i.totalAmount}}</td>
+            </tr>
+            <tr class="font-bold">
+              <td>Total</td>
+              <td></td>
+              <td>{{total}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Panel 3 -->
+      <!-- <div class="bg-white p-4 rounded shadow">
+          <h2 class="font-semibold mb-2">Auction Management</h2>
+          <table class="w-full text-sm mb-4">
+            <thead>
+              <tr class="text-left text-gray-500">
+                <th>Auction</th><th>Status</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Round 1</td><td class="text-blue-600">Open</td><td>Closed</td></tr>
+              <tr><td>Round 2</td><td class="text-red-600">Closed</td><td>Pending</td></tr>
+            </tbody>
+          </table>
+          <h3 class="text-sm font-medium mb-2">Bid Status</h3>
+          <div class="flex items-center gap-4">
+            <div class="w-4 h-4 bg-blue-400 rounded-full"></div>
+            <span class="text-sm">Paid: 70%</span>
+            <div class="w-4 h-4 bg-blue-900 rounded-full ml-4"></div>
+            <span class="text-sm">Unpaid: 30%</span>
+          </div>
+        </div> -->
+    </div>
+  </div>
+
+  <div class="w-[500px]  h-[580px] flex-1 bg-white rounded-2xl shadow-xl p-4 m-4 overflow-y-auto"
+    *ngIf="showcreategroup==true">
+
+    <h2 class="text-xl font-semibold text-center text-blue-700 mb-4">Create Group</h2>
+    <button (click)="showcreategroup = false"
+      class="absolute top-9 right-9 text-black-400 hover:text-gray-600 transition hover:cursor-pointer"
+      aria-label="Close">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd"
+          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+          clip-rule="evenodd" />
+      </svg>
+    </button>
+    <form #registerForm="ngForm" class="space-y-2">
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Group Name</label>
+        <input type="text" name="name" [(ngModel)]="formData.groupName" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <!-- <div class="flex items-center space-x-2">
+              <label class="w-32 text-sm font-bold text-gray-700">Group Type</label>
+              <input
+                type="text"
+                name="type"
+                [(ngModel)]="formData.groupType"
+                required
+                class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+              />
+            </div> -->
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm  font-bold text-gray-700">Interest (%)</label>
+        <input type="number" name="interest" [(ngModel)]="formData.interest" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Organizer ID</label>
+        <input type="text" name="organizerId" [(ngModel)]="formData.organizerId" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm  font-bold text-gray-700">Max Members</label>
+        <input type="number" name="members" [(ngModel)]="formData.members" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm  font-bold text-gray-700">Duration (mo)</label>
+        <input type="number" name="duration" [(ngModel)]="formData.duration" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Total Amount</label>
+        <input type="number" name="amount" [(ngModel)]="formData.totalAmount" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <!-- <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Monthly Amt</label>
+        <input type="number" name="monthlyamount" [(ngModel)]="formData.ticketValue" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div> -->
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Select Start Date</label>
+        <input type="date" name="startDate" [(ngModel)]="formData.startDate" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+      <!-- <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Select End Date</label>
+        <input type="date" name="endDate" [(ngModel)]="formData.endDate" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div> -->
+
+      <div class="flex items-center space-x-2">
+        <label class="w-32 text-sm font-bold text-gray-700">Description</label>
+        <input type="text" name="description" [(ngModel)]="formData.description" required
+          class="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm" />
+      </div>
+
+      <button (click)="onSubmit()"
+        class="w-full transition hover:cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-2 rounded-md text-sm font-medium hover:from-blue-600 hover:to-indigo-600 transition">
+        Create Group
+      </button>
+    </form>
+  </div>
+  <div *ngIf="showcreategroupmodal || approved==true || reject==true"
+    class="fixed inset-0 bg-gray-100 bg-opacity-50 flex items-center justify-center z-50" @fadeInOut>
+    <div
+      class="bg-white rounded-2xl shadow-xl p-6 w-80 transform transition-transform duration-300 scale-100 animate-slide-in">
+      <div class="flex flex-col items-center">
+        <svg class="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" stroke-width="2"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <h2 class="text-xl font-semibold text-green-600 mb-2" *ngIf="showcreategroupmodal==true">Group created
+          successfully </h2>
+        <p class="text-gray-700 mb-4 text-center" *ngIf="showcreategroupmodal==true">New Group has been created
+          successfully.</p>
+        <h2 class="text-xl font-semibold text-green-600 mb-2" *ngIf="approved==true">Approved Successfully</h2>
+        <p class="text-gray-700 mb-4 text-center" *ngIf="approved==true">New user hasbeen entered to the group</p>
+        <h2 class="text-xl font-semibold text-green-600 mb-2" *ngIf="reject==true">Request Rejected</h2>
+        <p class="text-gray-700 mb-4 text-center" *ngIf="reject==true">The user is not entered into thsi group</p>
+
+        <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition hover:cursor-pointer"
+          (click)="closeSuccessModal()">
+          Ok
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="mb-6 flex-1 border rounded-lg shadow p-4 bg-white" *ngIf="request==true && showParticipants==false">
+    <div *ngFor="let item of joinRequests | keyvalue" class="mb-6 border rounded-lg shadow p-4 bg-white">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">{{ item.key }}</h2>
+      <button (click)="request=false"
+        class="absolute top-9 right-9 text-black-400 hover:text-gray-600 transition hover:cursor-pointer"
+        aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd"
+            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+            clip-rule="evenodd" />
+        </svg>
+      </button>
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead>
+
+          <tr class="bg-gray-100 text-left">
+            <th class="px-4 py-2">User Name</th>
+            <th class="px-4 py-2">Email</th>
+            <th class="px-4 py-2">Address</th>
+            <th class="px-4 py-2">Actions</th>
+          </tr>
+
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of item.value" class="border-b">
+            <td class="px-4 py-2">{{ user.userName}}</td>
+            <td class="px-4 py-2">{{ user.userEmail }}</td>
+            <td class="px-4 py-2">{{ user.userAddress }}</td>
+            <td class="px-4 py-2 space-x-2">
+              <button (click)="approveUser(item.key, user.userId)"
+                class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded">Approve</button>
+              <button (click)="rejectUser(item.key, user.userId)"
+                class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded">Reject</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <app-participants class="flex-1" *ngIf="showParticipants == true"></app-participants>
+  <app-groups class="flex-1 " *ngIf="showGroup == true" [length]="length" [total]="total" [totalRequests]="totalRequests" [totalMembers]="totalMembers"></app-groups>
+</div>

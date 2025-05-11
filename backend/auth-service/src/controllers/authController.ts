@@ -13,6 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Register a new user
 export const register = async (req: Request, res: Response): Promise<void> => {
+  console.log("Inside registration")
   try {
     const { userName, userEmail, password, userMobileNum, userAddress, userRole } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -28,22 +29,29 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         'Welcome to Chit Fund System',
         `Hello ${savedUser.userName},\n\nThank you for registering!`
       );
-      res.status(201).json({ message: 'User registered successfully' });
-      return;
+       res.status(201).json({ message: 'User registered successfully' });
+       return;
+    } else {
+       res.status(response.status).json({ message: response.data.message });
+       return;
     }
 
     res.status(response.status).json({ message: response.data.message });
     return;
   } catch (error: any) {
-    console.error('Error in register:', error.message || error);
-    if (axios.isAxiosError(error) && error.response) {
-      const msg = error.response.data?.message || 'Error registering user';
-      const status = error.response.status || 500;
-      res.status(msg.includes('exists') ? 400 : status).json({ message: msg });
-      return;
+    if (axios.isAxiosError(error)) {
+      const msg = error.response?.data?.message || 'Error registering user';
+      const status = error.response?.status || 500;
+      if (msg.includes('exists')) {
+         res.status(400).json({ message: msg });
+         return;
+      }
+        res.status(status).json({ message: msg });
+        return;
     }
-    res.status(500).json({ message: 'Unexpected server error' });
-    return;
+    console.error('Unexpected error in register:', error);
+      res.status(500).json({ message: 'Unexpected server error' });
+      return;
   }
 };
 
@@ -92,11 +100,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       // don't block login on logging/email failure
     }
 
-    res.status(200).json({ message: 'Login successful', token });
-    return;
+     res.status(200).json({ message: 'Login successful', token });
+     return;
   } catch (error: any) {
-    console.error('Error during login process:', error.message || error);
-    res.status(500).json({ message: 'Unexpected server error' });
-    return;
+    if (axios.isAxiosError(error)) {
+      const msg = error.response?.data?.message || 'Error during login';
+      const status = error.response?.status || 500;
+       res.status(status).json({ message: msg });
+       return;
+    }
+    console.error('Unexpected error in login:', error);
+     res.status(500).json({ message: 'Unexpected server error' });
+     return;
   }
 };

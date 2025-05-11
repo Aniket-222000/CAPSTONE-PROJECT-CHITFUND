@@ -44,8 +44,8 @@ const TransactionSchema: Schema = new Schema({
   transactionType: { type: String, required: true },
   userId: { type: String, required: true },
   groupId: { type: String, required: true },
-  transactionFrom: { type: String, required: true },
-  transactionTo: { type: String, required: true },
+  transactionFrom: { type: String },
+  transactionTo: { type: String},
 });
 
 export default mongoose.model<ITransaction>('Transaction', TransactionSchema);

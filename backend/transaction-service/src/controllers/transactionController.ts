@@ -135,6 +135,7 @@ export const getTransactionsByType = async (req: Request, res: Response): Promis
 };
 
 export const createTransaction = async (req: Request, res: Response): Promise<void> => {
+  console.log("inside transaction")
   try {
     const {
       transactionId,
@@ -145,6 +146,7 @@ export const createTransaction = async (req: Request, res: Response): Promise<vo
       transactionDate,
       transactionFrom,
       transactionTo
+
     } = req.body;
 
     // Check for required fields
@@ -153,9 +155,7 @@ export const createTransaction = async (req: Request, res: Response): Promise<vo
       !groupId ||
       !transactionAmount ||
       !transactionType ||
-      !transactionDate ||
-      !transactionFrom ||
-      !transactionTo
+      !transactionDate 
     ) {
       res.status(400).json({ message: 'Missing required fields' });
       return;
@@ -175,6 +175,7 @@ export const createTransaction = async (req: Request, res: Response): Promise<vo
 
     const result = await service.createTransaction(transactionData);
     res.status(201).json(result);
+    return;
   } catch (error: any) {
     console.error('Create txn error:', error);
     if (error instanceof Error && error.message === 'Organizer not found') {
@@ -182,5 +183,6 @@ export const createTransaction = async (req: Request, res: Response): Promise<vo
       return;
     }
     res.status(500).json({ message: error.message || 'Server error' });
+    return
   }
 };

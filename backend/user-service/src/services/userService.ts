@@ -175,7 +175,7 @@ export default class UserService {
   async register(data: any) {
     const { userEmail, userName } = data;
     if (await User.findOne({ userEmail })) throw new Error('Email already exists');
-    if (await User.findOne({ userName })) throw new Error('Username already exists');
+    // if (await User.findOne({ userName })) throw new Error('Username already exists');
     const user = new User(data);
     return user.save();
   }
@@ -193,35 +193,41 @@ export default class UserService {
     return User.findOneAndUpdate({ userEmail: email }, update, { new: true, runValidators: true }).orFail();
   }
 
-  async respondToJoinRequest(groupName: string, userId: string, action: string) {
-    try {
-      if (action === 'accept') {
-        // Add user to group participants via group service
-        await axios.post(`http://localhost:3003/api/groups/${groupName}/participants`, { userId });
 
-        // Add group to user's groupIds
-        const user = await User.findOne({ userId });
-        if (user && !user.groupIds.includes(groupName)) {
-          user.groupIds.push(groupName);
-          await user.save();
-        }
-
-        // Remove join request from group
-        await axios.delete(`http://localhost:3003/api/groups/${groupName}/joinRequests/${userId}`);
-
-        return { message: 'User added to group and join request accepted.' };
-      } else if (action === 'reject') {
-        // Remove join request from group
-        await axios.delete(`http://localhost:3003/api/groups/${groupName}/joinRequests/${userId}`);
-        return { message: 'Join request rejected and removed.' };
-      } else {
-        throw new Error('Invalid action');
-      }
-    } catch (error) {
-      console.error('Error responding to join request:', error);
-      throw error;
-    }
+    // ... existing code ...
+async respondToJoinRequest(groupName: string, userId: string, action: string) {
+  try {
+    console.log("it is in the respond to join request section")
+  if (action === 'accept') {
+    console.log("inside accept")
+  // Add user to group participants via group service
+  await axios.get(`http://localhost:3003/api/groups/${groupName}/participants/${userId}`);
+  
+  // Add group to user's groupIds
+  const user = await User.findOne({ userId });
+  if (user && !user.groupIds.includes(groupName)) {
+  user.groupIds.push(groupName);
+  await user.save();
   }
+  
+  // Remove join request from group
+  await axios.delete(`http://localhost:3003/api/groups/${groupName}/joinRequests/${userId}`);
+  
+  return { message: 'User added to group and join request accepted.' };
+  } else if (action === 'reject') {
+  // Remove join request from group
+  await axios.delete(`http://localhost:3003/api/groups/${groupName}/joinRequests/${userId}`);
+  return { message: 'Join request rejected and removed.' };
+  } else {
+  throw new Error('Invalid action');
+  }
+  } catch (error) {
+  console.error('Error responding to join request:', error);
+  throw error;
+  }
+  }
+  // ... existing code ...
+  
 
   async addGroup(groupId: string, email: string) {
     const usr = await User.findOne({ userEmail: email }); if (!usr) throw new Error('User not found');

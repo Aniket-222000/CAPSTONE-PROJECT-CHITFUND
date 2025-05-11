@@ -42,8 +42,11 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined');
+}
 /**
  * Authenticate incoming requests by verifying the JWT token.
  * Attaches userId, userEmail, and userRole to req on success.
@@ -57,6 +60,7 @@ export const authenticateJWT = (req: Request, res: Response, next: NextFunction)
   const token = authHeader?.split(' ')[1];
   try {
     if (!token) throw new Error('Token is undefined');
+    console.log("secret key in authentication service",JWT_SECRET);
     const payload = jwt.verify(token, JWT_SECRET) as any;
     req.userId = payload.userId;
     req.userEmail = payload.userEmail;

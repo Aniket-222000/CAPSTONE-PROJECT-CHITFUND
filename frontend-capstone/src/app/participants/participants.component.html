@@ -1,0 +1,33 @@
+<div class="p-6 space-y-6">
+    <div *ngFor="let group of userdetails |keyvalue" class="border rounded-lg shadow-sm bg-white">
+
+        <div class="bg-gray-100 px-4 py-3 font-semibold text-lg text-gray-800 border-b">
+            {{group.key}}
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50 text-left text-sm text-gray-600">
+                  <tr>
+                    <th class="px-4 py-2">Name</th>
+                    <th class="px-4 py-2">Email</th>
+                    <th class="px-4 py-2">Address</th>
+                    <th class="px-4 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ng-container *ngFor="let user of group.value">
+                    <tr *ngFor="let participant of user.participants" class="border-t hover:bg-gray-50">
+                      <td class="px-4 py-2">{{ participant.userName }}</td>
+                      <td class="px-4 py-2">{{ participant.userEmail }}</td>
+                      <td class="px-4 py-2">{{ participant.userAddress }}</td>
+                      <td class="px-4 py-2 space-x-2">
+                        <button class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded">Info</button>
+                      </td>
+                    </tr>
+                  </ng-container>
+                </tbody>
+              </table>
+              
+        </div>
+    </div>

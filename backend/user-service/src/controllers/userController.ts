@@ -152,9 +152,11 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
     logActivity('REGISTER_USER', `User registered: ${user.userId}`, user.userId);
     await sendEmail(user.userEmail, 'Welcome', `Hello ${user.userName}, welcome!`);
     res.status(201).json(user);
+    return;
   } catch (err: any) {
-    if (err.message.includes('exists'))  res.status(400).json({ message: err.message });
+    if (err.message.includes('exists')) { res.status(400).json({ message: err.message });return;};
     res.status(500).json({ message: err.message });
+    return;
   }
 };
 
@@ -165,17 +167,17 @@ export const getAllUsers = async (_: Request, res: Response): Promise<void> => {
 export const getUserById = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = await service.getUserById(req.params.userId);
-    if (!user)  res.status(404).json({ message: 'User not found' });
-    res.status(200).json(user);
-  } catch { res.status(500).json({ message: 'Error fetching user' }); }
+    if (!user) { res.status(404).json({ message: 'User not found' });return;}
+    res.status(200).json(user);return;
+  } catch { res.status(500).json({ message: 'Error fetching user' });return; }
 };
 
 export const getUserByEmail = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = await service.getUserByEmail(req.params.userEmail);
-    if (!user)  res.status(404).json({ message: 'User not found' });
-    res.status(200).json(user);
-  } catch { res.status(500).json({ message: 'Error fetching user' }); }
+    if (!user) { res.status(404).json({ message: 'User not found' });return;}
+    res.status(200).json(user);return;
+  } catch { res.status(500).json({ message: 'Error fetching user' }); return;}
 };
 
 export const getListOfGroups = async (req: Request, res: Response): Promise<void> => {
@@ -189,14 +191,19 @@ export const editUserProfile = async (req: Request, res: Response): Promise<void
     logActivity('EDIT_PROFILE', `Profile edited: ${updated.userId}`, updated.userId);
     await sendEmail(updated.userEmail, 'Profile Updated', `Your profile was updated.`);
     res.status(200).json(updated);
+    return;
   } catch (err: any) {
     res.status(500).json({ message: err.message });
+    return;
   }
 };
 
 export const respondToJoinRequest = async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await service.respondToJoinRequest(req.params.groupId, req.params.userId, req.body.action);
+    console.log(req.body.action);
+    console.log(req.params.groupName);
+    console.log(req.params.userId);
+    const result = await service.respondToJoinRequest(req.params.groupName, req.params.userId, req.body.action);
     logActivity('JOIN_RESPONSE', `Request ${req.body.action} for user ${req.params.userId}`, req.params.userId, req.params.groupId);
     const user = await service.getUserById(req.params.userId);
     const userEmail = user?.userEmail;
