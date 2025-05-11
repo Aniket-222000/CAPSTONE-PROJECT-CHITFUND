@@ -151,6 +151,21 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
       group.contributions.push({ userId, month, amount, timestamp: new Date() });
       await group.save();
   
+      // Create transaction record
+      try {
+        await axios.post('http://localhost:3004/api/transactions', {
+          userId,
+          groupId,
+          amount,
+          type: 'REPAYMENT',
+          description: `Repayment for month ${month}`,
+          timestamp: new Date()
+        });
+      } catch (transactionErr) {
+        console.error('Error creating transaction record:', transactionErr);
+        // Continue execution even if transaction creation fails
+      }
+  
       logActivity('REPAY', `User ${userId} repaid ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
       res.status(200).json({ message: 'Contribution recorded' });
     } catch (err: any) {
