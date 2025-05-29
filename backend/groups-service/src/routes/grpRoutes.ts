@@ -55,7 +55,7 @@ router.post('/:groupId/report', generateReport);
 
 //monthly summery
 // In your routes file (likely groupRoutes.ts)
-router.get('/:groupId/monthly-summary/:month', getParticipantMonthlySummary);
+router.get('/:groupId/monthly-summary/:month/:userId', getParticipantMonthlySummary);
 
 // Add this new route for user-specific monthly summary
 router.get('/:groupId/monthly-summary/:month/user/:userId', getParticipantMonthlySummaryByUserId as any);

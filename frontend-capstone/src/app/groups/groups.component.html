@@ -28,8 +28,9 @@
                     <tr>
                         <th class="px-6 py-3 font-medium">Group Name</th>
                         <th class="px-6 py-3 font-medium">Start Date</th>
-                        <th class="px-6 py-3 font-medium">end Date</th>
+                        <th class="px-6 py-3 font-medium">End Date</th>
                         <th class="px-6 py-3 font-medium">Total Memebers Needed</th>
+                        <th class="px-6 py-3 font-medium">Number of Members Joined</th>
                         <th class="px-6 py-3 font-medium">Amount per Member</th>
                         <th class="px-6 py-3 font-medium">Total Fund</th>
                         <th class="px-6 py-3 font-medium">Status</th>
@@ -40,9 +41,10 @@
                     <ng-container *ngFor="let user of groupDetails">
                         <tr class="border-t hover:bg-gray-50">
                             <td class="px-6 py-4">{{user.groupName}}</td>
-                            <td class="px-6 py-4">{{user.startDate}}</td>
-                            <td class="px-6 py-4">{{user.endDate}}</td>
+                            <td class="px-6 py-4">{{user.startDate|date}}</td>
+                            <td class="px-6 py-4">{{user.endDate|date}}</td>
                             <td class="px-6 py-4">{{user.members}}</td>
+                            <td class="px-6 py-4">{{user.participants.length}}</td>
                             <td class="px-6 py-4">₹{{user.ticketValue}}</td>
                             <td class="px-6 py-4">₹{{user.totalAmount}}</td>
                             <td class="px-6 py-4 text-green-600 font-medium">{{user.status}}</td>

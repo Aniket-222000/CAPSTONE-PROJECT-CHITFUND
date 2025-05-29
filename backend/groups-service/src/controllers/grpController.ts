@@ -1,363 +1,373 @@
-import { Request,Response } from "express";
+import { Request, Response } from "express";
 import Group from "../models/groups";
 import axios from "axios";
 
 import { sendEmail } from '../utils/mailer';   // new added
 import { logActivity } from '../utils/auditLogger';  //new added
-
-export const createGroup = async (req:Request,res:Response) => {
-    try {
-        // If endDate is not provided, calculate it based on startDate and duration
-        if (!req.body.endDate && req.body.startDate && req.body.duration) {
-            const startDate = new Date(req.body.startDate);
-            const endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + req.body.duration);
-            req.body.endDate = endDate;
-        }
-        
-        const group = new Group(req.body);
-        const newGroup = await group.save();
-        
-        // Log activity
-        logActivity('CREATE_GROUP', `Created group with ID: ${newGroup.groupId}`, req.body.userId || 'anonymous', newGroup.groupId);
-        
-        res.status(201).json(newGroup);
-    } catch(error) {
-        console.error('Error creating group:', error);
-        res.status(400).json({message: error});
-    }
+// participant.model.ts
+export interface ParticipantPaymentInfo {
+  userId: string;
+  userName: string;
+  hasPaid: boolean;
+  datePaid: string | null;
+  warningCount: number;
+  installmentAmount: number;
+  remainingBalance: number;
 }
 
-export const getAllGroups = async (req:Request, res:Response) => {
-    try{
-        const groups = await Group.find();
-        
-        // Add status to each group
-        const groupsWithStatus = groups.map(group => {
-            const now = new Date();
-            const startDate = (group as any).startDate ? new Date((group as any).startDate) : new Date(group.createdAt);
-            const endDate = (group as any).endDate ? new Date((group as any).endDate) : (() => {
-                const date = new Date(startDate);
-                date.setMonth(date.getMonth() + group.duration);
-                return date;
-            })();
-            
-            let status = 'active';
-            if (now < startDate) {
-                status = 'pending';
-            } else if (now > endDate) {
-                status = 'closed';
-            }
-            
-            return {
-                ...group.toJSON(),
-                status
-            };
-        });
-        
-        res.status(200).json(groupsWithStatus);
-    }catch(error){
-        res.status(400).json({message:error});
+export const createGroup = async (req: Request, res: Response) => {
+  try {
+    // If endDate is not provided, calculate it based on startDate and duration
+    if (!req.body.endDate && req.body.startDate && req.body.duration) {
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + req.body.duration);
+      req.body.endDate = endDate;
     }
+
+    const group = new Group(req.body);
+    const newGroup = await group.save();
+
+    // Log activity
+    logActivity('CREATE_GROUP', `Created group with ID: ${newGroup.groupId}`, req.body.userId || 'anonymous', newGroup.groupId);
+
+    res.status(201).json(newGroup);
+  } catch (error) {
+    console.error('Error creating group:', error);
+    res.status(400).json({ message: error });
+  }
+}
+
+export const getAllGroups = async (req: Request, res: Response) => {
+  try {
+    const groups = await Group.find();
+
+    // Add status to each group
+    const groupsWithStatus = groups.map(group => {
+      const now = new Date();
+      const startDate = (group as any).startDate ? new Date((group as any).startDate) : new Date(group.createdAt);
+      const endDate = (group as any).endDate ? new Date((group as any).endDate) : (() => {
+        const date = new Date(startDate);
+        date.setMonth(date.getMonth() + group.duration);
+        return date;
+      })();
+
+      let status = 'active';
+      if (now < startDate) {
+        status = 'pending';
+      } else if (now > endDate) {
+        status = 'closed';
+      }
+
+      return {
+        ...group.toJSON(),
+        status
+      };
+    });
+
+    res.status(200).json(groupsWithStatus);
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
 }
 
 export const placeBid = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { userId, bidAmount, month } = req.body;
-    try {
-      const group = await Group.findOne({ groupId });
-      if (!group) {
-        res.status(404).json({ message: 'Group not found' });
-        return;
-      }
-  
-      group.bids.push({ userId, bidAmount, month, timestamp: new Date() });
-      await group.save();
-  
-      logActivity('PLACE_BID', `User ${userId} bid ₹${bidAmount} for month ${month}`, userId, groupId);
-      res.status(200).json({ message: 'Bid placed successfully' });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  };
-  
-  // 2. Run monthly draw and distribute commission
-  export const runDraw = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { month } = req.body;
-    try {
-      const group = await Group.findOne({ groupId });
-      if (!group) {
-        res.status(404).json({ message: 'Group not found' });
-        return;
-      }
-  
-      const bids = group.bids.filter(b => b.month === month);
-      if (bids.length === 0) {
-        res.status(400).json({ message: 'No bids this month' });
-        return;
-      }
-  
-      const winner = bids.reduce((min, b) => b.bidAmount < min.bidAmount ? b : min, bids[0]);
-      group.monthlyDraw[month - 1] = winner.userId;
-  
-      const diff = group.totalAmount - winner.bidAmount;
-      const commissionAmount = group.totalAmount * (group.interest / 100);
-      const pool = diff - commissionAmount;
-      const perMember = pool / group.members;
-  
-      await group.save();
-  
-      logActivity('RUN_DRAW', `Month ${month} winner ${winner.userId}`, req.body.userId || 'system', groupId);
-      
-      try {
-        // Get user email from users service
-        const userResponse = await axios.get(`http://localhost:3002/api/users/${winner.userId}`);
-        // Check if userEmail exists in the response data
-        const userEmail = userResponse.data.userEmail || userResponse.data.email;
-        
-        if (userEmail) {
-          await sendEmail(userEmail, 'You won the draw!', `Congrats! You won ₹${winner.bidAmount}`);
-        } else {
-          console.error('User email not found in response:', userResponse.data);
-        }
-      } catch (emailErr) {
-        console.error('Error sending email notification:', emailErr);
-        // Continue execution even if email fails
-      }
-  
-      res.status(200).json({
-        winner: { userId: winner.userId, bidAmount: winner.bidAmount },
-        commission: commissionAmount,
-        distribution: group.participants.map(u => ({ userId: u, amount: perMember })),
-      });
-    } catch (err: any) {
-      console.error('Error in runDraw:', err);
-      res.status(500).json({ message: err.message || 'Internal server error' });
-    }
-  };
-  
-  // 3. Record repayment
-  export const repay = async (req: Request, res: Response): Promise<void> => {
-    console.log("inside gorup pay")
-    const { groupId } = req.params;
-    const { userId, month, amount } = req.body;
-    try {
-      const group = await Group.findOne({ groupId });
-      if (!group) {
-        res.status(404).json({ message: 'Group not found' });
-        return;
-      }
-  
-      group.contributions.push({ userId, month, amount, timestamp: new Date() });
-      await group.save();
-  
-      // Create transaction record
-      try {
-        await axios.post('http://localhost:3004/api/transactions', {
-          userId:userId,
-          groupId:groupId,
-          transactionAmount:amount,
-          type: 'REPAYMENT',
-          description: `Repayment for month ${month}`,
-          transactionFrom:userId,
-          transactionTo:groupId,
-          timestamp: new Date()
-        });
-      } catch (transactionErr) {
-        console.error('Error creating transaction record:', transactionErr);
-        // Continue execution even if transaction creation fails
-      }
-      console.log("Aftr transactoion")
-      logActivity('REPAY', `User ${userId} repaid ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
-      res.status(200).json({ message: 'Contribution recorded' });
+  const { groupId } = req.params;
+  const { userId, bidAmount, month } = req.body;
+  try {
+    const group = await Group.findOne({ groupId });
+    if (!group) {
+      res.status(404).json({ message: 'Group not found' });
       return;
-    } catch (transactionErr: any) {
-      if (transactionErr.response) {
-        // The server responded with a status code outside the 2xx range
-        console.error('Transaction service error response:', transactionErr.response.status, transactionErr.response.data);
-      } else if (transactionErr.request) {
-        // The request was made but no response was received
-        console.error('No response from transaction service:', transactionErr.request);
+    }
+
+    group.bids.push({ userId, bidAmount, month, timestamp: new Date() });
+    await group.save();
+
+    logActivity('PLACE_BID', `User ${userId} bid ₹${bidAmount} for month ${month}`, userId, groupId);
+    res.status(200).json({ message: 'Bid placed successfully' });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 2. Run monthly draw and distribute commission
+export const runDraw = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { month } = req.body;
+  try {
+    const group = await Group.findOne({ groupId });
+    if (!group) {
+      res.status(404).json({ message: 'Group not found' });
+      return;
+    }
+
+    const bids = group.bids.filter(b => b.month === month);
+    if (bids.length === 0) {
+      res.status(400).json({ message: 'No bids this month' });
+      return;
+    }
+
+    const winner = bids.reduce((min, b) => b.bidAmount < min.bidAmount ? b : min, bids[0]);
+    group.monthlyDraw[month - 1] = winner.userId;
+
+    const diff = group.totalAmount - winner.bidAmount;
+    const commissionAmount = group.totalAmount * (group.interest / 100);
+    const pool = diff - commissionAmount;
+    const perMember = pool / group.members;
+
+    await group.save();
+
+    logActivity('RUN_DRAW', `Month ${month} winner ${winner.userId}`, req.body.userId || 'system', groupId);
+
+    try {
+      // Get user email from users service
+      const userResponse = await axios.get(`http://localhost:3002/api/users/${winner.userId}`);
+      // Check if userEmail exists in the response data
+      const userEmail = userResponse.data.userEmail || userResponse.data.email;
+
+      if (userEmail) {
+        await sendEmail(userEmail, 'You won the draw!', `Congrats! You won ₹${winner.bidAmount}`);
       } else {
-        // Something else went wrong
-        console.error('Axios setup error:', transactionErr.message);
+        console.error('User email not found in response:', userResponse.data);
       }
+    } catch (emailErr) {
+      console.error('Error sending email notification:', emailErr);
+      // Continue execution even if email fails
     }
-  };
-  
-  // 4. Check warnings
-  export const getWarnings = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    
-    // Check if warnings array exists and has content
-    if (!group.warnings || group.warnings.length === 0) {
-      // Return empty array with proper structure instead of null
-      res.status(200).json([]);
-      return;
-    }
-    
-    res.status(200).json(group.warnings);
-  };
-  
-  // 5. Remove member after 3 warnings
-  export const removeMember = async (req: Request, res: Response): Promise<void> => {
-    const { groupId, userId } = req.params;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-  
-    const warning = group.warnings.find(w => w.userId === userId);
-    if (!warning || warning.count < 3) {
-      res.status(400).json({ message: 'Insufficient warnings' });
-      return;
-    }
-  
-    group.participants = group.participants.filter(u => u !== userId);
-    await group.save();
-  
-    logActivity('REMOVE_MEMBER', `User ${userId} removed`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: `Member ${userId} removed after 3 warnings` });
-  };
-  
-  // 6. Lateral member request
-  export const lateralRequest = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { userId } = req.body;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    group.lateralRequests.push(userId);
-    await group.save();
-  
-    logActivity('LATERAL_REQUEST', `User ${userId} requested lateral join`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: 'Lateral–member join request sent' });
-  };
-  
-  // 6b. Approve lateral member
-  export const lateralApprove = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { userId } = req.body;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    group.lateralMembers.push({ userId, paidBackdated: false });
-    group.lateralRequests = group.lateralRequests.filter(u => u !== userId);
-    await group.save();
-  
-    const monthsFilled = group.monthlyDraw.length;
-    const backdatedDue = monthsFilled * (group.totalAmount / group.members);
-  
-    logActivity('LATERAL_APPROVE', `User ${userId} approved with due ₹${backdatedDue}`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: 'Lateral member approved', backdatedDue });
-  };
-  
-  // 6c. Back-dated payment
-  export const lateralPayment = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { userId, amountPaid } = req.body;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    group.lateralMembers = group.lateralMembers.map(l =>
-      l.userId === userId ? { ...l, paidBackdated: true } : l
-    );
-    group.contributions.push({ userId, month: 'backdated', amount: amountPaid, timestamp: new Date() });
-    await group.save();
-  
-    logActivity('LATERAL_PAYMENT', `User ${userId} paid backdated ₹${amountPaid}`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: 'Back-dated payment recorded' });
-  };
-  
-  // 7. Organizer compensation
-  export const compensate = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { month, amount } = req.body;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    group.organizerCompensations.push({ month, amount, timestamp: new Date() });
-    await group.save();
-  
-    logActivity('COMPENSATE', `Organizer compensated ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: `Organizer compensated ₹${amount} for month ${month}` });
-  };
-  
-  // 8. Adjust bid
-  export const adjustBid = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const { month, newBidAmount, userId } = req.body;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    const bid = group.bids.find(b => b.month === month && b.userId === userId);
-    if (bid) {
-      const old = bid.bidAmount;
-      bid.bidAmount = newBidAmount;
-      group.bidAdjustments.push({ month, oldAmount: old, newAmount: newBidAmount, timestamp: new Date() });
-    }
-    await group.save();
-  
-    logActivity('ADJUST_BID', `Bid adjusted to ₹${newBidAmount} for month ${month}`, req.body.userId || 'system', groupId);
-    res.status(200).json({ message: `Bid for month ${month} adjusted to ₹${newBidAmount}` });
-  };
-  
-  // 9. Get status
-  export const getStatus = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
-    const group = await Group.findOne({ groupId });
-    if (!group) {
-      res.status(404).json({ message: 'Group not found' });
-      return;
-    }
-    const balance = group.totalAmount - group.contributions.reduce((s, c) => s + c.amount, 0);
+
     res.status(200).json({
-      participants: group.participants,
-      warnings: group.warnings,
-      penalties: group.penalties,
-      lateralMembers: group.lateralMembers,
-      balance
+      winner: { userId: winner.userId, bidAmount: winner.bidAmount },
+      commission: commissionAmount,
+      distribution: group.participants.map(u => ({ userId: u, amount: perMember })),
     });
-  };
-  
-  // 10. Get history
-  export const getHistory = async (req: Request, res: Response): Promise<void> => {
-    const { groupId } = req.params;
+  } catch (err: any) {
+    console.error('Error in runDraw:', err);
+    res.status(500).json({ message: err.message || 'Internal server error' });
+  }
+};
+
+// 3. Record repayment
+export const repay = async (req: Request, res: Response): Promise<void> => {
+  console.log("inside gorup pay")
+  const { groupId } = req.params;
+  const { userId, month, amount } = req.body;
+  try {
     const group = await Group.findOne({ groupId });
     if (!group) {
       res.status(404).json({ message: 'Group not found' });
       return;
     }
-    const history = group.monthlyDraw.map((winner, i) => ({
-      month: i + 1,
-      winner,
-      distribution: group.participants.map(u => ({ userId: u, amount: null })),
-      missedPayments: group.participants.filter(u =>
-        !group.contributions.some(c => c.userId === u && c.month === i + 1)
-      ),
-      penalties: group.penalties.filter((p: any) => p.month === i + 1),
-      warnings: group.warnings.filter(w => w.month === i + 1)
-    }));
-    res.status(200).json(history);
-  };
-  
+
+    group.contributions.push({ userId, month, amount, timestamp: new Date() });
+    await group.save();
+
+    // Create transaction record
+    try {
+      await axios.post('http://localhost:3004/api/transactions', {
+        userId: userId,
+        groupId: groupId,
+        transactionAmount: amount,
+        type: 'REPAYMENT',
+        description: `Repayment for month ${month}`,
+        transactionFrom: userId,
+        transactionTo: groupId,
+        timestamp: new Date()
+      });
+    } catch (transactionErr) {
+      console.error('Error creating transaction record:', transactionErr);
+      // Continue execution even if transaction creation fails
+    }
+    console.log("Aftr transactoion")
+    logActivity('REPAY', `User ${userId} repaid ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
+    res.status(200).json({ message: 'Contribution recorded' });
+    return;
+  } catch (transactionErr: any) {
+    if (transactionErr.response) {
+      // The server responded with a status code outside the 2xx range
+      console.error('Transaction service error response:', transactionErr.response.status, transactionErr.response.data);
+    } else if (transactionErr.request) {
+      // The request was made but no response was received
+      console.error('No response from transaction service:', transactionErr.request);
+    } else {
+      // Something else went wrong
+      console.error('Axios setup error:', transactionErr.message);
+    }
+  }
+};
+
+// 4. Check warnings
+export const getWarnings = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+
+  // Check if warnings array exists and has content
+  if (!group.warnings || group.warnings.length === 0) {
+    // Return empty array with proper structure instead of null
+    res.status(200).json([]);
+    return;
+  }
+
+  res.status(200).json(group.warnings);
+};
+
+// 5. Remove member after 3 warnings
+export const removeMember = async (req: Request, res: Response): Promise<void> => {
+  const { groupId, userId } = req.params;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+
+  const warning = group.warnings.find(w => w.userId === userId);
+  if (!warning || warning.count < 3) {
+    res.status(400).json({ message: 'Insufficient warnings' });
+    return;
+  }
+
+  group.participants = group.participants.filter(u => u !== userId);
+  await group.save();
+
+  logActivity('REMOVE_MEMBER', `User ${userId} removed`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: `Member ${userId} removed after 3 warnings` });
+};
+
+// 6. Lateral member request
+export const lateralRequest = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { userId } = req.body;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  group.lateralRequests.push(userId);
+  await group.save();
+
+  logActivity('LATERAL_REQUEST', `User ${userId} requested lateral join`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: 'Lateral–member join request sent' });
+};
+
+// 6b. Approve lateral member
+export const lateralApprove = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { userId } = req.body;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  group.lateralMembers.push({ userId, paidBackdated: false });
+  group.lateralRequests = group.lateralRequests.filter(u => u !== userId);
+  await group.save();
+
+  const monthsFilled = group.monthlyDraw.length;
+  const backdatedDue = monthsFilled * (group.totalAmount / group.members);
+
+  logActivity('LATERAL_APPROVE', `User ${userId} approved with due ₹${backdatedDue}`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: 'Lateral member approved', backdatedDue });
+};
+
+// 6c. Back-dated payment
+export const lateralPayment = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { userId, amountPaid } = req.body;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  group.lateralMembers = group.lateralMembers.map(l =>
+    l.userId === userId ? { ...l, paidBackdated: true } : l
+  );
+  group.contributions.push({ userId, month: 'backdated', amount: amountPaid, timestamp: new Date() });
+  await group.save();
+
+  logActivity('LATERAL_PAYMENT', `User ${userId} paid backdated ₹${amountPaid}`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: 'Back-dated payment recorded' });
+};
+
+// 7. Organizer compensation
+export const compensate = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { month, amount } = req.body;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  group.organizerCompensations.push({ month, amount, timestamp: new Date() });
+  await group.save();
+
+  logActivity('COMPENSATE', `Organizer compensated ₹${amount} for month ${month}`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: `Organizer compensated ₹${amount} for month ${month}` });
+};
+
+// 8. Adjust bid
+export const adjustBid = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const { month, newBidAmount, userId } = req.body;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  const bid = group.bids.find(b => b.month === month && b.userId === userId);
+  if (bid) {
+    const old = bid.bidAmount;
+    bid.bidAmount = newBidAmount;
+    group.bidAdjustments.push({ month, oldAmount: old, newAmount: newBidAmount, timestamp: new Date() });
+  }
+  await group.save();
+
+  logActivity('ADJUST_BID', `Bid adjusted to ₹${newBidAmount} for month ${month}`, req.body.userId || 'system', groupId);
+  res.status(200).json({ message: `Bid for month ${month} adjusted to ₹${newBidAmount}` });
+};
+
+// 9. Get status
+export const getStatus = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  const balance = group.totalAmount - group.contributions.reduce((s, c) => s + c.amount, 0);
+  res.status(200).json({
+    participants: group.participants,
+    warnings: group.warnings,
+    penalties: group.penalties,
+    lateralMembers: group.lateralMembers,
+    balance
+  });
+};
+
+// 10. Get history
+export const getHistory = async (req: Request, res: Response): Promise<void> => {
+  const { groupId } = req.params;
+  const group = await Group.findOne({ groupId });
+  if (!group) {
+    res.status(404).json({ message: 'Group not found' });
+    return;
+  }
+  const history = group.monthlyDraw.map((winner, i) => ({
+    month: i + 1,
+    winner,
+    distribution: group.participants.map(u => ({ userId: u, amount: null })),
+    missedPayments: group.participants.filter(u =>
+      !group.contributions.some(c => c.userId === u && c.month === i + 1)
+    ),
+    penalties: group.penalties.filter((p: any) => p.month === i + 1),
+    warnings: group.warnings.filter(w => w.month === i + 1)
+  }));
+  res.status(200).json(history);
+};
+
 
 export const getByGroupId = async (req: Request, res: Response) => {
   try {
@@ -372,11 +382,11 @@ export const getByGroupId = async (req: Request, res: Response) => {
     const now = new Date();
     const startDate = (group as any).startDate ? new Date((group as any).startDate) : new Date(group.createdAt);
     const endDate = (group as any).endDate ? new Date((group as any).endDate) : (() => {
-        const date = new Date(startDate);
-        date.setMonth(date.getMonth() + group.duration);
-        return date;
+      const date = new Date(startDate);
+      date.setMonth(date.getMonth() + group.duration);
+      return date;
     })();
-    
+
     let status = 'active';
     if (now < startDate) {
       status = 'pending';
@@ -396,192 +406,192 @@ export const getByGroupId = async (req: Request, res: Response) => {
   }
 };
 
-  export const handleMissedPayment = async (req: Request, res: Response): Promise<void> => {
-      try {
-        const { groupId, userId, missedAmount } = req.body;
-    
-        const group = await Group.findOne({ groupId });
-        if (!group) {
-          res.status(404).json({ message: 'Group not found' });
-          
-          return;
-        }
-    
-        // Calculate penalty (10% of missed amount, capped at ₹2000)
-        const penaltyRate = 0.1;
-        const penaltyCap = 2000;
-        let penalty = missedAmount * penaltyRate;
-        penalty = Math.min(penalty, penaltyCap);
-    
-        // Record penalty
-        group.penalties.push({ userId, penalty });
-        
-        // Find existing warning or create new one
-        const existingWarning = group.warnings.find(w => w.userId === userId);
-        if (existingWarning) {
-          existingWarning.count = (existingWarning.count || 0) + 1;
-        } else {
-          group.warnings.push({ userId, count: 1, month: new Date().getMonth() + 1 });
-        }
-        
-        await group.save();
-    
-        // Log penalty activity
-        logActivity(
-          'PENALTY_APPLIED',
-          `Applied penalty of ₹${penalty} to member ${userId} for missing ₹${missedAmount}`,
-          (req.body.userId || 'anonymous'),
-          groupId
-        );
-    
-        // Fetch member and organizer data
-        const memberResp = await axios.get(`http://localhost:3002/api/users/${userId}`);
-        const member = memberResp.data;
-        const organizerResp = await axios.get(`http://localhost:3002/api/users/${group.organizerId}`);
-        const organizer = organizerResp.data;
-    
-        // Notify member
-        await sendEmail(
-          member.userEmail,
-          'Chit Fund: Missed Payment Penalty',
-          `Hello ${member.userName},\n\nYou missed your contribution of ₹${missedAmount}. A penalty of ₹${penalty} has been applied to your account.\n\nPlease pay at the earliest to avoid further action.`
-        );
-    
-        // Notify organizer
-        await sendEmail(
-          organizer.userEmail,
-          'Chit Fund Alert: Member Missed Payment',
-          `Hello ${organizer.userName},\n\nMember ${member.userName} (ID: ${userId}) missed their contribution of ₹${missedAmount} and was penalized ₹${penalty}.`
-        );
-    
-        res.status(200).json({ message: 'Penalty applied and notifications sent' });
-      } catch (error: any) {
-        console.error('Error in handleMissedPayment:', error);
-        if (error.response) {
-          console.error('Error response data:', error.response.data);
-          console.error('Error response status:', error.response.status);
-        }
-        res.status(500).json({ message: error.message || 'Internal server error' });
-      }
-    };
-  
+export const handleMissedPayment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { groupId, userId, missedAmount } = req.body;
 
-export const updateGroup = async(req:Request,res:Response)=>{
-    try{
-        const group = await Group.findOneAndUpdate({groupId:req.params.groupId},req.body,{new:true});
-        res.status(200).json(group);
-    }catch(error){
-        res.status(400).json({message:error});
+    const group = await Group.findOne({ groupId });
+    if (!group) {
+      res.status(404).json({ message: 'Group not found' });
+
+      return;
     }
+
+    // Calculate penalty (10% of missed amount, capped at ₹2000)
+    const penaltyRate = 0.1;
+    const penaltyCap = 2000;
+    let penalty = missedAmount * penaltyRate;
+    penalty = Math.min(penalty, penaltyCap);
+
+    // Record penalty
+    group.penalties.push({ userId, penalty });
+
+    // Find existing warning or create new one
+    const existingWarning = group.warnings.find(w => w.userId === userId);
+    if (existingWarning) {
+      existingWarning.count = (existingWarning.count || 0) + 1;
+    } else {
+      group.warnings.push({ userId, count: 1, month: new Date().getMonth() + 1 });
+    }
+
+    await group.save();
+
+    // Log penalty activity
+    logActivity(
+      'PENALTY_APPLIED',
+      `Applied penalty of ₹${penalty} to member ${userId} for missing ₹${missedAmount}`,
+      (req.body.userId || 'anonymous'),
+      groupId
+    );
+
+    // Fetch member and organizer data
+    const memberResp = await axios.get(`http://localhost:3002/api/users/${userId}`);
+    const member = memberResp.data;
+    const organizerResp = await axios.get(`http://localhost:3002/api/users/${group.organizerId}`);
+    const organizer = organizerResp.data;
+
+    // Notify member
+    await sendEmail(
+      member.userEmail,
+      'Chit Fund: Missed Payment Penalty',
+      `Hello ${member.userName},\n\nYou missed your contribution of ₹${missedAmount}. A penalty of ₹${penalty} has been applied to your account.\n\nPlease pay at the earliest to avoid further action.`
+    );
+
+    // Notify organizer
+    await sendEmail(
+      organizer.userEmail,
+      'Chit Fund Alert: Member Missed Payment',
+      `Hello ${organizer.userName},\n\nMember ${member.userName} (ID: ${userId}) missed their contribution of ₹${missedAmount} and was penalized ₹${penalty}.`
+    );
+
+    res.status(200).json({ message: 'Penalty applied and notifications sent' });
+  } catch (error: any) {
+    console.error('Error in handleMissedPayment:', error);
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+    }
+    res.status(500).json({ message: error.message || 'Internal server error' });
+  }
+};
+
+
+export const updateGroup = async (req: Request, res: Response) => {
+  try {
+    const group = await Group.findOneAndUpdate({ groupId: req.params.groupId }, req.body, { new: true });
+    res.status(200).json(group);
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
 }
 
-export const deleteGroup = async(req:Request,res:Response)=>{
-    try{
-        await Group.deleteOne({groupName:req.params.groupName});
-        
-        res.status(200).json({message:"Deleted successfully"});
-    }catch(error){
-        res.status(400).json({message:error});
-    }
-} 
+export const deleteGroup = async (req: Request, res: Response) => {
+  try {
+    await Group.deleteOne({ groupName: req.params.groupName });
+
+    res.status(200).json({ message: "Deleted successfully" });
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
+}
 
 export const requestToJoinGroup = async (req: Request, res: Response) => {
 
-    const { groupId ,userId } = req.body; // Assuming you send userId and groupId in the request body
+  const { groupId, userId } = req.body; // Assuming you send userId and groupId in the request body
 
-    try {
-        const group = await Group.findOne({ groupId });
+  try {
+    const group = await Group.findOne({ groupId });
 
-        if (!group) {
-            return res.status(404).json({ message: "Group not found" });
-        }
-
-        // Check if the user has already requested to join
-        if (group.joinRequests.some(request => request === userId)) {
-            return res.status(400).json({ message: "Request already sent" });
-        }
-
-        // Add the request to the joinRequests array
-        group.joinRequests.push(userId);
-        await group.save();
-
-        res.status(200).json({ message: "Join request sent successfully" });
-    } catch (error) {
-        res.status(400).json({ message: error });
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
     }
+
+    // Check if the user has already requested to join
+    if (group.joinRequests.some(request => request === userId)) {
+      return res.status(400).json({ message: "Request already sent" });
+    }
+
+    // Add the request to the joinRequests array
+    group.joinRequests.push(userId);
+    await group.save();
+
+    res.status(200).json({ message: "Join request sent successfully" });
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
 };
 
-export const getAllRequests  = async (req: Request, res: Response) => {
-    try {
-        const group = await Group.findOne({ groupId: req.params.groupId });
-        if(!group){
-            return res.status(404).json({message:"Group not found"});
-        }
-        const requests = group.joinRequests;
-        res.status(200).json(requests);
+export const getAllRequests = async (req: Request, res: Response) => {
+  try {
+    const group = await Group.findOne({ groupId: req.params.groupId });
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
     }
-    catch(error){
-        res.status(400).json({message:error});
-    }
+    const requests = group.joinRequests;
+    res.status(200).json(requests);
+  }
+  catch (error) {
+    res.status(400).json({ message: error });
+  }
 }
 
 
-export const addParticipant = async(req:Request, res:Response)=>{
-    try{
-        const group = await Group.findOne({groupName:req.params.groupName});
-        if(!group){
-            return res.status(404).json({message:"Group not found"});
-        }
-        console.log(req.params.userId);
-        group.participants.push(req.params.userId);
-        // Find the index of the request
-        const requestIndex = group.joinRequests.findIndex(request => request === req.params.userId);
-        if (requestIndex === -1) {
-            return res.status(404).json({ message: "Join request not found" });
-        }
-        group.joinRequests.splice(requestIndex, 1);
-        const updatedGroup = await group.save();
-        res.status(200).json(updatedGroup);
-    }catch(error){
-        res.status(400).json({message:error});
+export const addParticipant = async (req: Request, res: Response) => {
+  try {
+    const group = await Group.findOne({ groupName: req.params.groupName });
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
     }
+    console.log(req.params.userId);
+    group.participants.push(req.params.userId);
+    // Find the index of the request
+    const requestIndex = group.joinRequests.findIndex(request => request === req.params.userId);
+    if (requestIndex === -1) {
+      return res.status(404).json({ message: "Join request not found" });
+    }
+    group.joinRequests.splice(requestIndex, 1);
+    const updatedGroup = await group.save();
+    res.status(200).json(updatedGroup);
+  } catch (error) {
+    res.status(400).json({ message: error });
+  }
 }
 
 
 updateGroup
 export const getParticipantsOfGroup = async (req: Request, res: Response) => {
-    try {
-        // Find the group by groupId
-        const group = await Group.findOne({ groupName: req.params.groupName });
-        console.log(group);
-        if (!group) {
-            return res.status(404).json({ message: "Group not found" });
-        }
-
-        // If there are no participants, return an empty array
-        if (group.participants.length === 0) {
-            return res.status(200).json({ participants: [] });
-        }
-
-        // Fetch participant details for each participant ID
-        const participantPromises = group.participants.map(async (userId) => {
-            console.log(userId);
-            const response = await axios.get(`http://localhost:3002/api/users/${userId}`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            return response.data; // Assuming the user data is returned in the response
-        });
-
-        // Resolve all promises
-        const participantsDetails = await Promise.all(participantPromises);
-        
-        res.status(200).json({ participants: participantsDetails });
-    } catch (error) {
-        console.error('Error fetching participants:', error);
-        res.status(400).json("Failed to fetch participants");
+  try {
+    // Find the group by groupId
+    const group = await Group.findOne({ groupName: req.params.groupName });
+    console.log(group);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
     }
+
+    // If there are no participants, return an empty array
+    if (group.participants.length === 0) {
+      return res.status(200).json({ participants: [] });
+    }
+
+    // Fetch participant details for each participant ID
+    const participantPromises = group.participants.map(async (userId) => {
+      console.log(userId);
+      const response = await axios.get(`http://localhost:3002/api/users/${userId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data; // Assuming the user data is returned in the response
+    });
+
+    // Resolve all promises
+    const participantsDetails = await Promise.all(participantPromises);
+
+    res.status(200).json({ participants: participantsDetails });
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    res.status(400).json("Failed to fetch participants");
+  }
 }
 
 // export const calculateChit = (req: Request, res: Response) => {
@@ -619,161 +629,147 @@ export const getParticipantsOfGroup = async (req: Request, res: Response) => {
 
 // ... existing code ...
 
-export const getParticipantMonthlySummary = async (req: Request, res: Response): Promise<void> => {
+export const getParticipantMonthlySummary = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { groupId, month, userId } = req.params;
+
   try {
-    const { groupId, month,userId } = req.params;
-    
     // Find the group
     const group = await Group.findOne({ groupId });
     if (!group) {
       res.status(404).json({ message: 'Group not found' });
       return;
     }
-    
-    // Get all participants
-    const participantIds = group.participants;
-    
-    // Prepare summary data for each participant
-    const summaryPromises = participantIds.map(async (userId) => {
-      try {
-        // Get user details from user service
-        const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const userData = userResponse.data;
-        
-        // Check if user has paid for this month
-        const hasPaid = group.contributions.some(
-          c => c.userId === userId && c.month === parseInt(month)
-        );
-        
-        // Get payment date if paid
-        const payment = group.contributions.find(
-          c => c.userId === userId && c.month === parseInt(month)
-        );
-        const datePaid = payment ? new Date(payment.timestamp).toISOString() : null;
-        
-        // Get warnings for this user
-        const warningObj = group.warnings.find(w => w.userId === userId);
-        const warningCount = warningObj ? warningObj.count : 0;
-        
-        // Calculate installment amount (total amount divided by duration)
-        const installmentAmount = group.totalAmount / group.duration;
-        
-        // Calculate remaining balance
-        // Sum all contributions by this user
-        const totalPaid = group.contributions
-          .filter(c => c.userId === userId)
-          .reduce((sum, c) => sum + c.amount, 0);
-        
-        // Total expected payment up to this month
-        const expectedPayment = installmentAmount * parseInt(month);
-        
-        // Remaining balance
-        const remainingBalance = expectedPayment - totalPaid;
-        
-        return {
-          userId,
-          userName: userData.userName,
-          hasPaid,
-          datePaid,
-          warningCount,
-          installmentAmount,
-          remainingBalance: remainingBalance > 0 ? remainingBalance : 0
-        };
-      } catch (error) {
-        console.error(`Error fetching data for user ${userId}:`, error);
-        return {
-          userId,
-          userName: "Unknown",
-          hasPaid: false,
-          datePaid: null,
-          warningCount: 0,
-          installmentAmount: group.totalAmount / group.duration,
-          remainingBalance: group.totalAmount / group.duration
-        };
-      }
+
+    // Get user details from user service
+    const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`, {
+      headers: { 'Content-Type': 'application/json' }
     });
-    
-    const summaryData = await Promise.all(summaryPromises);
-    
-    res.status(200).json({
-      groupId,
-      month,
-      participants: summaryData
+    const userData = userResponse.data;
+
+    // Check if user has paid for this month
+    const hasPaid = group.contributions.some(
+      (c) => c.userId === userId && c.month === parseInt(month)
+    );
+
+    // Get payment date if paid
+    const payment = group.contributions.find(
+      (c) => c.userId === userId && c.month === parseInt(month)
+    );
+    const datePaid = payment ? new Date(payment.timestamp).toISOString() : null;
+
+    // Get warnings for this user
+    const warningObj = group.warnings.find((w) => w.userId === userId);
+    const warningCount = warningObj ? warningObj.count : 0;
+
+    // Calculate installment amount (total amount divided by duration)
+    const installmentAmount = group.totalAmount / group.duration;
+
+    // Calculate remaining balance
+    // Sum all contributions by this user
+    const totalPaid = group.contributions
+      .filter((c) => c.userId === userId)
+      .reduce((sum, c) => sum + c.amount, 0);
+
+    // Total expected payment up to this month
+    const expectedPayment = installmentAmount * parseInt(month);
+
+    // Remaining balance
+    const remainingBalance = expectedPayment - totalPaid;
+
+    // **Send the response here**
+    res.json({
+      userId,
+      userName: userData.userName,
+      hasPaid,
+      datePaid,
+      warningCount,
+      installmentAmount,
+      remainingBalance: remainingBalance > 0 ? remainingBalance : 0,
     });
-    
+    return;
   } catch (error) {
-    console.error('Error generating participant monthly summary:', error);
-    res.status(500).json({ 
-      message: 'Failed to generate monthly summary',
-      error: error instanceof Error ? error.message : 'An unknown error occurred'
-    });
+    console.error(`Error fetching data for user ${userId}:`, error);
+    res.status(500).json({ error: 'Internal Server Error' });
+    return;
   }
 };
+
+
+
 
 export const getParticipantMonthlySummaryByUserId = async (req: Request, res: Response) => {
   try {
     const { groupId, month, userId } = req.params;
-    
+
     // Find the group
     const group = await Group.findOne({ groupId });
     if (!group) {
       return res.status(404).json({ message: "Group not found" });
     }
-    
+
     // Check if user is a participant in the group
     if (!group.participants.includes(userId)) {
       return res.status(404).json({ message: "User is not a participant in this group" });
     }
-    
+
     // Get user details
     const userResponse = await axios.get(`http://localhost:3002/api/users/${userId}`);
     const user = userResponse.data;
-    const acutalMonth=parseInt(month)-1;
+    const acutalMonth = parseInt(month) - 1;
     // Get payment records for this month
     const paymentRecords = group.contributions || [];
-    console.log("paymentRecords ,",paymentRecords);
+    const bid = group.bids || [];
+    const bidRecord = bid.filter(record => {
+
+      console.log(record.userId, "userId", userId);
+      return record.month == parseInt(month) && record.userId == userId;
+    }
+    );
+    console.log("paymentRecords ,", paymentRecords);
     const monthlyRecords = paymentRecords.filter(record => {
 
-;
-      console.log(record.userId,"userId",userId);
+      console.log(record.userId, "userId", userId);
       return record.month == month && record.userId == userId;
     }
     );
-    
+
     // Get warnings for this user
     const warnings = group.warnings || [];
     const userWarnings = warnings.filter(warning => warning.userId === userId);
-    
+
     // Calculate installment amount
     const installmentAmount = group.totalAmount / group.duration;
-    
+    const bidAmountMax = group.totalAmount - (group.totalAmount * (group.interest / 100));
     // Check if user has paid for this month
     const hasPaid = monthlyRecords.length > 0;
     console.log(hasPaid)
-    console.log(monthlyRecords,"monthly")
+    console.log(monthlyRecords, "monthly")
     const datePaid = hasPaid ? monthlyRecords[0].timestamp : null;
     console.log(datePaid)
     // Calculate remaining balance
     const remainingBalance = hasPaid ? 0 : installmentAmount;
-    
+    const hasBid = bidRecord.length > 0;
     const participantSummary = {
       userId: user._id,
       userName: user.userName,
-      hasPaid:hasPaid,
-      datePaid:datePaid,
+      hasPaid: hasPaid,
+      datePaid: datePaid,
+      hasBid: hasBid,
+      maxBidAmount: bidAmountMax,
       warningCount: userWarnings.length,
       installmentAmount: parseFloat(installmentAmount.toFixed(2)),
       remainingBalance: parseFloat(remainingBalance.toFixed(2))
     };
-    
+
     res.status(200).json({
       groupId,
       month,
       participant: participantSummary
     });
-    
+
   } catch (error) {
     console.error('Error fetching participant monthly summary:', error);
     res.status(500).json({ message: "Failed to fetch participant monthly summary" });
@@ -783,143 +779,143 @@ export const getParticipantMonthlySummaryByUserId = async (req: Request, res: Re
 
 export const calculateChit = async (req: Request, res: Response) => {
   try {
-      const { totalAmount, months, members, commission } = req.body;
-      const { groupId } = req.params;
+    const { totalAmount, months, members, commission } = req.body;
+    const { groupId } = req.params;
 
-      // Validate inputs
-      if (!totalAmount || !months || !members || !commission || 
-          totalAmount <= 0 || months <= 0 || members <= 0 || commission <= 0) {
-          return res.status(400).json({ message: "Please enter valid values for all fields." });
-      }
+    // Validate inputs
+    if (!totalAmount || !months || !members || !commission ||
+      totalAmount <= 0 || months <= 0 || members <= 0 || commission <= 0) {
+      return res.status(400).json({ message: "Please enter valid values for all fields." });
+    }
 
-      // Fetch bid amount from the API
-      const drawResponse = await axios.get(`http://localhost:3003/api/groups/${groupId}/draw`);
-      
-      if (!drawResponse.data || !drawResponse.data.winner || !drawResponse.data.winner.bidAmount) {
-          return res.status(400).json({ message: "Could not retrieve bid amount from draw API." });
-      }
+    // Fetch bid amount from the API
+    const drawResponse = await axios.get(`http://localhost:3003/api/groups/${groupId}/draw`);
 
-      const bidAmount = drawResponse.data.winner.bidAmount;
+    if (!drawResponse.data || !drawResponse.data.winner || !drawResponse.data.winner.bidAmount) {
+      return res.status(400).json({ message: "Could not retrieve bid amount from draw API." });
+    }
 
-      // Check if bid amount is less than total amount
-      if (bidAmount >= totalAmount) {
-          return res.status(400).json({ message: "Bid amount must be less than the fund value." });
-      }
+    const bidAmount = drawResponse.data.winner.bidAmount;
 
-      // Calculate the difference between fund value and bid amount
-      const totalDifference = totalAmount - bidAmount;
-      
-      // Calculate commission amount
-      const totalCommission = (commission * totalDifference) / 100;
-      
-      // Calculate net amount to be distributed among members
-      const netAmount = totalDifference - totalCommission;
-      
-      // Calculate individual share for each member
-      const individualShare = netAmount / members;
+    // Check if bid amount is less than total amount
+    if (bidAmount >= totalAmount) {
+      return res.status(400).json({ message: "Bid amount must be less than the fund value." });
+    }
 
-      // Prepare the results
-      const results = {
-          fundValue: totalAmount,
-          bidAmount: bidAmount,
-          totalDifference: totalDifference,
-          commissionPercentage: commission,
-          totalCommission: totalCommission,
-          netAmountDistributed: netAmount,
-          numberOfMembers: members,
-          individualShare: individualShare
-      };
+    // Calculate the difference between fund value and bid amount
+    const totalDifference = totalAmount - bidAmount;
 
-      return res.status(200).json(results);
+    // Calculate commission amount
+    const totalCommission = (commission * totalDifference) / 100;
+
+    // Calculate net amount to be distributed among members
+    const netAmount = totalDifference - totalCommission;
+
+    // Calculate individual share for each member
+    const individualShare = netAmount / members;
+
+    // Prepare the results
+    const results = {
+      fundValue: totalAmount,
+      bidAmount: bidAmount,
+      totalDifference: totalDifference,
+      commissionPercentage: commission,
+      totalCommission: totalCommission,
+      netAmountDistributed: netAmount,
+      numberOfMembers: members,
+      individualShare: individualShare
+    };
+
+    return res.status(200).json(results);
   } catch (error) {
-      console.error('Error calculating chit fund distribution:', error);
-      return res.status(500).json({ 
-          message: "Failed to calculate chit fund distribution", 
-          error: error instanceof Error ? error.message : 'An unknown error occurred'
-      });
+    console.error('Error calculating chit fund distribution:', error);
+    return res.status(500).json({
+      message: "Failed to calculate chit fund distribution",
+      error: error instanceof Error ? error.message : 'An unknown error occurred'
+    });
   }
 };
 
 
 
 export const getOrganizerOfGroup = async (req: Request, res: Response) => {
-    try {
-        const group = await Group.findOne({ groupId: req.params.groupId }).select('organizerId');
-        console.log(group); // Select only the organizer field
-        if (!group) {
-            return res.status(404).json({ message: 'Group not found' });
-        }
-        res.json(group);
-    } catch (error) {
-        console.error('Error fetching group:', error);
-        res.status(500).json({ message: 'Server error' });
+  try {
+    const group = await Group.findOne({ groupId: req.params.groupId }).select('organizerId');
+    console.log(group); // Select only the organizer field
+    if (!group) {
+      return res.status(404).json({ message: 'Group not found' });
     }
+    res.json(group);
+  } catch (error) {
+    console.error('Error fetching group:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 }
 
 // Helper function to calculate chit details
 const calculateChitDetails = (totalAmount: number, months: number, members: number, commission: number) => {
-    const results: Array<any> = [];
-    const Amount = totalAmount / members;
-    let interest = months / 200;
-    let minAmount = totalAmount * (1 - interest);
-    interest = 0;
+  const results: Array<any> = [];
+  const Amount = totalAmount / members;
+  let interest = months / 200;
+  let minAmount = totalAmount * (1 - interest);
+  interest = 0;
 
-    for (let month = 1; month <= months; month++) {
-        interest += minAmount;
-        const commissionAmount = (minAmount * commission) / 100;
-        const amountGiven = minAmount - commissionAmount;
+  for (let month = 1; month <= months; month++) {
+    interest += minAmount;
+    const commissionAmount = (minAmount * commission) / 100;
+    const amountGiven = minAmount - commissionAmount;
 
-        results.push({
-            month: month,
-            amount: minAmount.toFixed(2),
-            commission: commissionAmount.toFixed(2),
-            amountGiven: amountGiven.toFixed(2),
-        });
+    results.push({
+      month: month,
+      amount: minAmount.toFixed(2),
+      commission: commissionAmount.toFixed(2),
+      amountGiven: amountGiven.toFixed(2),
+    });
 
-        minAmount += 0.01 * totalAmount;
-    }
+    minAmount += 0.01 * totalAmount;
+  }
 
-    const totalProfit = totalAmount * months - interest;
-    return { results, totalProfit };
+  const totalProfit = totalAmount * months - interest;
+  return { results, totalProfit };
 };
 
 export const displayMonthlyPlan = async (req: Request, res: Response) => {
-    try {
-        // Calculate monthly plan details using a helper function
-        const group = await Group.findOne({ groupId: req.params.groupId });
-        if (!group) {
-            return res.status(404).json({ message: "Group not found" });
-        }
-        const { createdAt, totalAmount, duration, interest } = req.body;
-        const months = duration;
-
-        if (!createdAt || !totalAmount || months <= 0 || totalAmount <= 0) {
-            return res.status(400).json({ message: "Please provide valid values for groupId, createdAt, totalAmount, and months." });
-        }
-        const { results } = calculateChitDetails(totalAmount, months, months, interest);
-
-        const monthlyDraw = group.monthlyDraw;
-        const participantsResponse = await axios.get(`http://localhost:3003/api/groups/${req.params.groupId}/participants`);
-        const userNames = participantsResponse.data.participants.map((participant: any) => participant.userName);
-
-        // Shuffle usernames randomly
-        const shuffledUserNames = userNames.sort(() => Math.random() - 0.5);
-
-        if (monthlyDraw.length === 0) {
-            // Loop through results and assign each month a unique user by cycling through the shuffled list
-            for (let i = 0; i < results.length; i++) {
-                monthlyDraw.push(shuffledUserNames[i % shuffledUserNames.length]);
-            }
-        }
-
-        // Update the group with the monthlyDraw array
-        const updatedGroup = await group.save();
-        return res.status(200).json({ results, monthlyDraw });
-    } 
-    catch (error) {
-        console.error("Error fetching participants or updating group:", error);
-        return res.status(500).json({ message: "An error occurred while processing the request." });
+  try {
+    // Calculate monthly plan details using a helper function
+    const group = await Group.findOne({ groupId: req.params.groupId });
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
     }
+    const { createdAt, totalAmount, duration, interest } = req.body;
+    const months = duration;
+
+    if (!createdAt || !totalAmount || months <= 0 || totalAmount <= 0) {
+      return res.status(400).json({ message: "Please provide valid values for groupId, createdAt, totalAmount, and months." });
+    }
+    const { results } = calculateChitDetails(totalAmount, months, months, interest);
+
+    const monthlyDraw = group.monthlyDraw;
+    const participantsResponse = await axios.get(`http://localhost:3003/api/groups/${req.params.groupId}/participants`);
+    const userNames = participantsResponse.data.participants.map((participant: any) => participant.userName);
+
+    // Shuffle usernames randomly
+    const shuffledUserNames = userNames.sort(() => Math.random() - 0.5);
+
+    if (monthlyDraw.length === 0) {
+      // Loop through results and assign each month a unique user by cycling through the shuffled list
+      for (let i = 0; i < results.length; i++) {
+        monthlyDraw.push(shuffledUserNames[i % shuffledUserNames.length]);
+      }
+    }
+
+    // Update the group with the monthlyDraw array
+    const updatedGroup = await group.save();
+    return res.status(200).json({ results, monthlyDraw });
+  }
+  catch (error) {
+    console.error("Error fetching participants or updating group:", error);
+    return res.status(500).json({ message: "An error occurred while processing the request." });
+  }
 };
 
 // ... existing code ...
@@ -935,27 +931,27 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //   try {
 //     const { groupId } = req.params;
 //     const { reportType, userId } = req.body;
-    
+
 //     // Find the group
 //     const group = await Group.findOne({ groupId });
 //     if (!group) {
 //       res.status(404).json({ message: 'Group not found' });
 //       return;
 //     }
-    
+
 //     // Create a PDF document
 //     const doc = new PDFDocument();
 //     const fileName = `${groupId}_${reportType}_${Date.now()}.pdf`;
 //     const filePath = path.join(__dirname, '..', '..', 'temp', fileName);
-    
+
 //     // Ensure temp directory exists
 //     if (!fs.existsSync(path.join(__dirname, '..', '..', 'temp'))) {
 //       fs.mkdirSync(path.join(__dirname, '..', '..', 'temp'), { recursive: true });
 //     }
-    
+
 //     // Pipe the PDF to a file
 //     doc.pipe(fs.createWriteStream(filePath));
-    
+
 //     // Add content based on report type
 //     doc.fontSize(25).text('Digital Fund Management System', { align: 'center' });
 //     doc.moveDown();
@@ -963,7 +959,7 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //     doc.moveDown();
 //     doc.fontSize(12).text(`Generated on: ${new Date().toLocaleString()}`, { align: 'right' });
 //     doc.moveDown();
-    
+
 //     // Different content based on report type
 //     switch (reportType) {
 //       case 'monthly-plan':
@@ -978,10 +974,10 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //       default:
 //         doc.text('Invalid report type specified');
 //     }
-    
+
 //     // Finalize the PDF
 //     doc.end();
-    
+
 //     // Wait for the file to be created
 //     setTimeout(() => {
 //       // Send the file
@@ -990,13 +986,13 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //           console.error('Error sending file:', err);
 //           res.status(500).json({ message: 'Error generating report' });
 //         }
-        
+
 //         // Delete the file after sending
 //         fs.unlink(filePath, (unlinkErr) => {
 //           if (unlinkErr) console.error('Error deleting temporary file:', unlinkErr);
 //         });
 //       });
-      
+
 //       // Log activity
 //       logActivity(
 //         'GENERATE_REPORT',
@@ -1015,10 +1011,10 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 // async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
 //   doc.fontSize(16).text('Monthly Plan Details', { underline: true });
 //   doc.moveDown();
-  
+
 //   // Calculate monthly plan if needed
 //   const { results } = calculateChitDetails(group.totalAmount, group.duration, group.members, group.interest);
-  
+
 //   // Create a table-like structure
 //   doc.fontSize(12);
 //   doc.text('Month', 50, doc.y, { width: 100 });
@@ -1027,11 +1023,11 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //   doc.text('Amount Given', 350, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.text('Assigned User', 450, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.moveDown();
-  
+
 //   // Add a line
 //   doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
 //   doc.moveDown();
-  
+
 //   // Add each month's data
 //   results.forEach((entry: any, index: number) => {
 //     const userName = group.monthlyDraw[index] || 'N/A';
@@ -1047,19 +1043,19 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 // async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userId?: string) {
 //   doc.fontSize(16).text('Transaction History', { underline: true });
 //   doc.moveDown();
-  
+
 //   // Fetch transactions
 //   let url = `http://localhost:3000/api/transactions/find/group/${group.groupId}`;
 //   if (userId) {
 //     url = `http://localhost:3000/api/transactions/find/user/${userId}?groupId=${group.groupId}`;
 //   }
-  
+
 //   const response = await axios.get(url, {
 //     headers: { 'Content-Type': 'application/json' }
 //   });
-  
+
 //   const transactions = response.data;
-  
+
 //   // Create a table-like structure
 //   doc.fontSize(12);
 //   doc.text('Date', 50, doc.y, { width: 100 });
@@ -1068,11 +1064,11 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //   doc.text('From', 310, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.text('To', 410, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.moveDown();
-  
+
 //   // Add a line
 //   doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
 //   doc.moveDown();
-  
+
 //   // Add each transaction
 //   if (transactions.length === 0) {
 //     doc.text('No transactions found');
@@ -1092,14 +1088,14 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 // async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
 //   doc.fontSize(16).text('Member Status Report', { underline: true });
 //   doc.moveDown();
-  
+
 //   // Fetch participants
 //   const participantsResponse = await axios.get(`http://localhost:3003/api/groups/${group.groupId}/participants`, {
 //     headers: { 'Content-Type': 'application/json' }
 //   });
-  
+
 //   const participants = participantsResponse.data.participants;
-  
+
 //   // Create a table-like structure
 //   doc.fontSize(12);
 //   doc.text('Member Name', 50, doc.y, { width: 150 });
@@ -1107,24 +1103,24 @@ export const displayMonthlyPlan = async (req: Request, res: Response) => {
 //   doc.text('Warnings', 300, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.text('Penalties', 400, doc.y - doc.currentLineHeight(), { width: 100 });
 //   doc.moveDown();
-  
+
 //   // Add a line
 //   doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
 //   doc.moveDown();
-  
+
 //   // Add each member's data
 //   for (const participant of participants) {
 //     // Count payments
 //     const payments = group.contributions.filter((c: any) => c.userId === participant.userId).length;
-    
+
 //     // Get warnings
 //     const warning = group.warnings.find((w: any) => w.userId === participant.userId);
 //     const warningCount = warning ? warning.count : 0;
-    
+
 //     // Get penalties
 //     const penalties = group.penalties.filter((p: any) => p.userId === participant.userId);
 //     const penaltyTotal = penalties.reduce((sum: number, p: any) => sum + p.penalty, 0);
-    
+
 //     doc.text(participant.userName, 50, doc.y, { width: 150 });
 //     doc.text(payments.toString(), 200, doc.y - doc.currentLineHeight(), { width: 100 });
 //     doc.text(warningCount.toString(), 300, doc.y - doc.currentLineHeight(), { width: 100 });
@@ -1202,35 +1198,35 @@ class PDFTable {
   drawHeader() {
     // Add a title space before the header
     this.currentY = this.doc.y + 5;
-    
+
     // Draw header background
     this.doc
       .rect(this.startX, this.currentY, this.tableWidth, this.rowHeight)
       .fill(this.options.headerFillColor);
-    
+
     // Draw header text
     this.doc.fillColor(this.options.headerTextColor).fontSize(this.options.headerFontSize);
-    
+
     let xPos = this.startX;
     this.columns.forEach(column => {
-      const textOptions = { 
-        width: column.width, 
-        align: column.align || 'left' 
+      const textOptions = {
+        width: column.width,
+        align: column.align || 'left'
       };
-      
+
       this.doc.text(
-        column.header, 
-        xPos + this.options.padding, 
+        column.header,
+        xPos + this.options.padding,
         this.currentY + this.options.padding,
-        { 
+        {
           width: column.width,
           align: column.align as 'left' | 'right' | 'center' | 'justify'
         }
       );
-      
+
       xPos += column.width;
     });
-    
+
     this.currentY += this.rowHeight;
     this.headerFilled = true;
     return this;
@@ -1241,50 +1237,50 @@ class PDFTable {
     if (this.currentY + this.rowHeight > this.doc.page.height - 50) {
       this.doc.addPage();
       this.currentY = 50; // Reset Y position for new page
-      
+
       // Re-draw header on new page
       if (this.headerFilled) {
         this.drawHeader();
       }
     }
-    
+
     // Draw row background
     const fillColor = isAlternate ? this.options.alternateRowFillColor : this.options.rowFillColor;
     this.doc
       .rect(this.startX, this.currentY, this.tableWidth, this.rowHeight)
       .fill(fillColor);
-    
+
     // Draw row text
     this.doc.fillColor(this.options.textColor).fontSize(this.options.fontSize);
-    
+
     let xPos = this.startX;
     this.columns.forEach(column => {
       const value = data[column.property] !== undefined ? data[column.property].toString() : '';
-      const textOptions = { 
-        width: column.width, 
-        align: column.align || 'left' 
+      const textOptions = {
+        width: column.width,
+        align: column.align || 'left'
       };
-      
+
       this.doc.text(
-        value, 
-        xPos + this.options.padding, 
+        value,
+        xPos + this.options.padding,
         this.currentY + this.options.padding,
-{ 
-  width: column.width,
-  align: column.align as 'left' | 'right' | 'center' | 'justify'
-}
+        {
+          width: column.width,
+          align: column.align as 'left' | 'right' | 'center' | 'justify'
+        }
       );
-      
+
       xPos += column.width;
     });
-    
+
     // Draw bottom border
     this.doc
       .moveTo(this.startX, this.currentY + this.rowHeight)
       .lineTo(this.startX + this.tableWidth, this.currentY + this.rowHeight)
       .strokeColor(this.options.lineColor)
       .stroke();
-    
+
     this.currentY += this.rowHeight;
     return this;
   }
@@ -1307,13 +1303,13 @@ const addDocumentStyling = (doc: PDFKit.PDFDocument, group: any, reportType: str
   // Add logo placeholder
   doc.rect(50, 50, 100, 60).fillColor('#eeeeee').fill();
   doc.fillColor('#999999').fontSize(10).text('LOGO', 75, 75, { align: 'center' });
-  
+
   // Add header
   doc.fillColor('#333333');
   doc.fontSize(18).text('Digital Fund Management System', 170, 50);
   doc.fontSize(12).text(`${group.groupName}`, 170, 75);
   doc.fontSize(14).text(`${reportType.toUpperCase()} REPORT`, 170, 95);
-  
+
   // Add report info box
   doc.rect(400, 50, 150, 60).fillColor('#f9f9f9').fill();
   doc.fillColor('#666666').fontSize(9);
@@ -1321,20 +1317,20 @@ const addDocumentStyling = (doc: PDFKit.PDFDocument, group: any, reportType: str
   doc.fillColor('#333333').fontSize(10);
   doc.text(new Date().toLocaleDateString('en-US', {
     year: 'numeric',
-    month: 'long', 
+    month: 'long',
     day: 'numeric'
   }), 410, 70);
   doc.fillColor('#666666').fontSize(9);
   doc.text('Group ID:', 410, 85);
   doc.fillColor('#333333').fontSize(10);
   doc.text(group.groupId, 410, 100);
-  
+
   // Add separator line
   doc.moveTo(50, 130).lineTo(550, 130).strokeColor('#dddddd').stroke();
-  
+
   // Reset position for content
   doc.y = 150;
-  
+
   return doc;
 };
 
@@ -1342,14 +1338,14 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
   try {
     const { groupId } = req.params;
     const { reportType, userId } = req.body;
-    
+
     // Find the group
     const group = await Group.findOne({ groupId });
     if (!group) {
       res.status(404).json({ message: 'Group not found' });
       return;
     }
-    
+
     // Create a PDF document with better font and margins
     const doc = new PDFDocument({
       margins: { top: 50, bottom: 50, left: 50, right: 50 },
@@ -1360,21 +1356,21 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
         Subject: `${reportType} Report for Group ${groupId}`
       }
     });
-    
+
     const fileName = `${group.groupName.replace(/\s+/g, '_')}_${reportType}_${Date.now()}.pdf`;
     const filePath = path.join(__dirname, '..', '..', 'temp', fileName);
-    
+
     // Ensure temp directory exists
     if (!fs.existsSync(path.join(__dirname, '..', '..', 'temp'))) {
       fs.mkdirSync(path.join(__dirname, '..', '..', 'temp'), { recursive: true });
     }
-    
+
     // Pipe the PDF to a file
     doc.pipe(fs.createWriteStream(filePath));
-    
+
     // Add document styling
     addDocumentStyling(doc, group, reportType);
-    
+
     // Add page numbers after generating all content and before doc.end()
     // Different content based on report type
     switch (reportType) {
@@ -1390,7 +1386,7 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
       default:
         doc.text('Invalid report type specified');
     }
-    
+
     // Add page numbers to all pages
     const pageCount = doc.bufferedPageRange().count;
     if (pageCount > 0) {
@@ -1410,7 +1406,7 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
     }
     // Finalize the PDF
     doc.end();
-    
+
     // Wait for the file to be created
     setTimeout(() => {
       // Send the file
@@ -1419,13 +1415,13 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
           console.error('Error sending file:', err);
           res.status(500).json({ message: 'Error generating report' });
         }
-        
+
         // Delete the file after sending
         fs.unlink(filePath, (unlinkErr) => {
           if (unlinkErr) console.error('Error deleting temporary file:', unlinkErr);
         });
       });
-      
+
       // Log activity
       logActivity(
         'GENERATE_REPORT',
@@ -1444,10 +1440,10 @@ export const generateReport = async (req: Request, res: Response): Promise<void>
 async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
   // Add report description
   doc.fontSize(11).fillColor('#666666')
-    .text('This report shows the monthly plan details for this group, including the distribution of funds and assigned members.', 
-          { align: 'justify' });
+    .text('This report shows the monthly plan details for this group, including the distribution of funds and assigned members.',
+      { align: 'justify' });
   doc.moveDown();
-  
+
   // Add report summary
   doc.fontSize(12).fillColor('#333333');
   doc.text('Summary Information', { underline: true });
@@ -1458,15 +1454,15 @@ async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
   doc.text(`   Members: ${group.members}`, { continued: true });
   doc.text(`   Interest Rate: ${group.interest}%`);
   doc.moveDown(2);
-  
+
   // Calculate monthly plan if needed
   const { results } = calculateChitDetails(group.totalAmount, group.duration, group.members, group.interest);
-  
+
   // Create a table for monthly plan
   doc.fontSize(14).fillColor('#333333');
   doc.text('Monthly Distribution Plan', { underline: true });
   doc.moveDown();
-  
+
   const table = new PDFTable(doc, {
     headerFillColor: '#4472C4',
     headerTextColor: '#ffffff',
@@ -1474,7 +1470,7 @@ async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
     alternateRowFillColor: '#ffffff',
     lineColor: '#BFBFBF'
   });
-  
+
   table.addColumns([
     { header: 'Month', property: 'month', width: 60, align: 'center' },
     { header: 'Contribution', property: 'amount', width: 90, align: 'right' },
@@ -1482,8 +1478,8 @@ async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
     { header: 'Amount Given', property: 'amountGiven', width: 100, align: 'right' },
     { header: 'Assigned Member', property: 'userName', width: 150, align: 'left' }
   ])
-  .drawHeader();
-  
+    .drawHeader();
+
   // Add each month's data
   const tableData = results.map((entry: any, index: number) => ({
     month: entry.month,
@@ -1492,9 +1488,9 @@ async function addMonthlyPlanContent(doc: PDFKit.PDFDocument, group: any) {
     amountGiven: formatCurrency(entry.amountGiven),
     userName: group.monthlyDraw[index] || 'Not Assigned'
   }));
-  
+
   table.addRows(tableData).end();
-  
+
   // Add summary notes
   doc.moveDown();
   doc.fontSize(10).fillColor('#666666');
@@ -1505,33 +1501,33 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
   // Add report description
   doc.fontSize(11).fillColor('#666666');
   if (userId) {
-    doc.text(`This report shows the transaction history for user ID ${userId} in group "${group.groupName}".`, 
-          { align: 'justify' });
+    doc.text(`This report shows the transaction history for user ID ${userId} in group "${group.groupName}".`,
+      { align: 'justify' });
   } else {
-    doc.text(`This report shows the full transaction history for group "${group.groupName}".`, 
-          { align: 'justify' });
+    doc.text(`This report shows the full transaction history for group "${group.groupName}".`,
+      { align: 'justify' });
   }
   doc.moveDown();
-  
+
   // Fetch transactions
   let url = `http://localhost:3000/api/transactions/find/group/${group.groupId}`;
   if (userId) {
     url = `http://localhost:3000/api/transactions/find/user/${userId}?groupId=${group.groupId}`;
   }
-  
+
   const response = await axios.get(url, {
     headers: { 'Content-Type': 'application/json' }
   });
-  
+
   const transactions = response.data;
-  
+
   // Add report summary
   doc.fontSize(12).fillColor('#333333');
   doc.text('Transaction Summary', { underline: true });
   doc.moveDown(0.5);
   doc.fontSize(10).fillColor('#444444');
   doc.text(`Total Transactions: ${transactions.length}`, { continued: true });
-  
+
   if (transactions.length > 0) {
     const totalAmount = transactions.reduce((sum: number, t: any) => sum + t.transactionAmount, 0);
     doc.text(`   Total Amount: ${formatCurrency(totalAmount)}`);
@@ -1539,12 +1535,12 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
     doc.text('');
   }
   doc.moveDown(2);
-  
+
   // Create a table for transactions
   doc.fontSize(14).fillColor('#333333');
   doc.text('Transaction Details', { underline: true });
   doc.moveDown();
-  
+
   const table = new PDFTable(doc, {
     headerFillColor: '#4472C4',
     headerTextColor: '#ffffff',
@@ -1552,7 +1548,7 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
     alternateRowFillColor: '#ffffff',
     lineColor: '#BFBFBF'
   });
-  
+
   table.addColumns([
     { header: 'Date', property: 'date', width: 80, align: 'left' },
     { header: 'Trans. ID', property: 'id', width: 70, align: 'center' },
@@ -1561,17 +1557,17 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
     { header: 'From', property: 'from', width: 100, align: 'left' },
     { header: 'To', property: 'to', width: 100, align: 'left' }
   ])
-  .drawHeader();
-  
+    .drawHeader();
+
   // Add transaction data
   if (transactions.length === 0) {
     doc.text('No transactions found for the specified criteria.');
   } else {
     // Sort transactions by date (newest first)
-    transactions.sort((a: any, b: any) => 
+    transactions.sort((a: any, b: any) =>
       new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
     );
-    
+
     const tableData = transactions.map((transaction: any, index: number) => ({
       date: formatDate(transaction.transactionDate),
       id: transaction.transactionId ? transaction.transactionId.slice(-6) : String(index + 1),
@@ -1580,10 +1576,10 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
       from: transaction.transactionFrom || '-',
       to: transaction.transactionTo || '-'
     }));
-    
+
     table.addRows(tableData).end();
   }
-  
+
   // Add notes
   doc.moveDown();
   doc.fontSize(10).fillColor('#666666');
@@ -1593,17 +1589,17 @@ async function addTransactionsContent(doc: PDFKit.PDFDocument, group: any, userI
 async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
   // Add report description
   doc.fontSize(11).fillColor('#666666')
-    .text(`This report provides a detailed status of all members in the group "${group.groupName}", including their payment history and compliance status.`, 
-          { align: 'justify' });
+    .text(`This report provides a detailed status of all members in the group "${group.groupName}", including their payment history and compliance status.`,
+      { align: 'justify' });
   doc.moveDown();
-  
+
   // Fetch participants
   const participantsResponse = await axios.get(`http://localhost:3003/api/groups/${group.groupId}/participants`, {
     headers: { 'Content-Type': 'application/json' }
   });
-  
+
   const participants = participantsResponse.data.participants;
-  
+
   // Add report summary
   doc.fontSize(12).fillColor('#333333');
   doc.text('Group Summary', { underline: true });
@@ -1613,12 +1609,12 @@ async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
   doc.text(`   Active Since: ${formatDate(group.createdAt || Date.now())}`, { continued: true });
   doc.text(`   Current Cycle: ${group.currentCycle || 1}/${group.duration}`);
   doc.moveDown(2);
-  
+
   // Create a table for member status
   doc.fontSize(14).fillColor('#333333');
   doc.text('Member Status Details', { underline: true });
   doc.moveDown();
-  
+
   const table = new PDFTable(doc, {
     headerFillColor: '#4472C4',
     headerTextColor: '#ffffff',
@@ -1626,7 +1622,7 @@ async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
     alternateRowFillColor: '#ffffff',
     lineColor: '#BFBFBF'
   });
-  
+
   table.addColumns([
     { header: 'Member Name', property: 'name', width: 130, align: 'left' },
     { header: 'Role', property: 'role', width: 70, align: 'center' },
@@ -1636,36 +1632,36 @@ async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
     { header: 'Penalties ($)', property: 'penalties', width: 70, align: 'right' },
     { header: 'Status', property: 'status', width: 60, align: 'center' }
   ])
-  .drawHeader();
-  
+    .drawHeader();
+
   // Prepare and add member data
   const tableData = [];
   for (const participant of participants) {
     // Count payments
     const payments = group.contributions.filter((c: any) => c.userId === participant.userId).length;
-    
+
     // Calculate on-time percentage
     const onTimePayments = group.contributions.filter(
       (c: any) => c.userId === participant.userId && c.onTime === true
     ).length;
     const onTimePercent = payments > 0 ? Math.round((onTimePayments / payments) * 100) : 0;
-    
+
     // Get warnings
     const warning = group.warnings.find((w: any) => w.userId === participant.userId);
     const warningCount = warning ? warning.count : 0;
-    
+
     // Get penalties
     const penalties = group.penalties.filter((p: any) => p.userId === participant.userId);
     const penaltyTotal = penalties.reduce((sum: number, p: any) => sum + p.penalty, 0);
-    
+
     // Determine status
     let status = 'Good';
     if (warningCount >= 3) status = 'At Risk';
     if (penaltyTotal > 0) status = 'Penalized';
-    
+
     // Determine role
     const role = participant.userId === group.groupAdmin ? 'Admin' : 'Member';
-    
+
     tableData.push({
       name: participant.userName,
       role: role,
@@ -1676,9 +1672,9 @@ async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
       status: status
     });
   }
-  
+
   table.addRows(tableData).end();
-  
+
   // Add explanation of statuses
   doc.moveDown(2);
   doc.fontSize(12).fillColor('#333333');
@@ -1688,7 +1684,7 @@ async function addMemberStatusContent(doc: PDFKit.PDFDocument, group: any) {
   doc.text('• Good: Member is in compliance with group rules and payments.');
   doc.text('• At Risk: Member has received 3 or more warnings for late payments.');
   doc.text('• Penalized: Member has incurred financial penalties due to rule violations.');
-  
+
   // Add notes
   doc.moveDown();
   doc.fontSize(10).fillColor('#666666');

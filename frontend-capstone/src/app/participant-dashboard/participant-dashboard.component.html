@@ -248,10 +248,36 @@
             <td class="px-4 py-2">{{ item.participant.warningCount }}</td>
             
             <td class="px-4 py-2">
-              <button *ngIf="item.participant.hasPaid" (click)="placeBid(item.groupId,item.month,item.participant.installmentAmount.toFixed(2))" class="px-4 py-2 bg-blue-600 mr-5 text-white rounded-md hover:bg-blue-700 transition">Place Bid</button>
+              <button *ngIf="item.participant.hasPaid && !item.participant.hasBid" (click)="placeBid()" class="px-4 py-2 bg-blue-600 mr-5 text-white rounded-md hover:bg-blue-700 transition">Place Bid</button>
     
               <button  (click)="payAmount1(item.groupId,item.month,item.participant.installmentAmount.toFixed(2))" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"> {{ item.participant.hasPaid ? 'Get Receipt' : 'Pay' }}</button></td>
-            <div *ngIf="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+              <div *ngIf="placeUserBid==true" class="bg-white p-4 rounded shadow-md w-64">
+                <h3>You Maximum Possible Bid Amount is {{item.participant.maxBidAmount}}</h3>
+                <h2 class="text-lg font-semibold mb-2">Enter Bid Amount</h2>
+                <input
+                  type="number"
+                  [(ngModel)]="bidAmount"
+                  class="w-full border border-gray-300 rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter amount"
+                />
+                <button
+                  (click)="submitBid(item.groupId,item.month,item.participant.maxBidAmount)"
+                  class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                >
+                  Submit Bid
+                </button>
+              </div>
+              <div *ngIf="showConfirmModal1" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                <div class="bg-white p-6 rounded shadow-md w-80">
+                  <h2 class="text-lg font-semibold mb-4">Confirm Bid</h2>
+                  <p class="mb-4">Bid done for month  <strong>{{ item.month }}</strong></p>
+                  <p class="mb-4">Bid amount is  <strong>{{ bidAmount }}</strong></p>
+                  <div class="flex justify-end gap-2">
+                     <button (click)="showConfirmModal1 = false" class="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Ok</button>
+                  </div>
+                </div>
+              </div>
+              <div *ngIf="showConfirmModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
               <div class="bg-white p-6 rounded shadow-md w-80">
                 <h2 class="text-lg font-semibold mb-4">Confirm Payment</h2>
                 <p class="mb-4">Payment done for month  <strong>{{ item.month }}</strong></p>

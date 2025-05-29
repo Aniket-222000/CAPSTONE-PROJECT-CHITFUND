@@ -9,6 +9,9 @@ import { HttpClient } from '@angular/common/http';
   styleUrl: './participants.component.css'
 })
 export class ParticipantsComponent implements OnInit{
+info(arg0: any) {
+throw new Error('Method not implemented.');
+}
 log(_t19: any) {
   console.log(_t19);
 throw new Error('Method not implemented.');

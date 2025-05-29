@@ -21,9 +21,10 @@ export interface JwtPayload {
 })
 
 export class ParticipantDashboardComponent implements OnInit {
-placeBid(arg0: any,arg1: any,arg2: any) {
-throw new Error('Method not implemented.');
-}
+placeUserBid: any;
+
+  month: any;
+
 
 
   selectedOption: any;
@@ -60,6 +61,8 @@ throw new Error('Method not implemented.');
   matchsummary: any=[];
 viewSummary: any;
 showConfirmModal: boolean=false;
+bidAmount: boolean=false;
+showConfirmModal1: any;
 
   constructor(private http: HttpClient, private router: Router) { }
   ngOnInit(): void {
@@ -203,6 +206,7 @@ showConfirmModal: boolean=false;
     this.matchsummary=[];
   }
   fetchDetails(index: number) {
+    this.month=index+1;
     this.matchsummary=[];
     this.http.get(`http://localhost:3000/api/groups/${this.viewGroupId}/monthly-summary/${index+1}/user/${this.userId}`).subscribe({
       next: (response: any) => {
@@ -232,6 +236,25 @@ showConfirmModal: boolean=false;
     })
     
   }
-    
-
+  placeBid() {
+    this.placeUserBid=!this.placeUserBid;
+    }
+  submitBid(groupId:any,month:any,maxBidAmount:any) {
+    if(maxBidAmount<this.bidAmount ){
+      alert("Bid amount should be less than Maximum bid amount"+maxBidAmount);
+    }
+    else{
+    this.http.post(`http://localhost:3000/api/groups/${groupId}/bid`, { userId: this.userId, bidAmount: this.bidAmount,month:month })
+    .subscribe({
+      next: (response: any) => {
+        console.log(response, "payment");
+        this.fetchDetails(month-1);
+        this.placeUserBid=false;
+      },
+      error: (error) => {
+        console.log(error, "after month bid");
+      }
+    })
+    }
+  }
 }
